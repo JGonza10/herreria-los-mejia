@@ -49,8 +49,8 @@ export default function Chatbot() {
             maxHeight: 420,
             display: "flex",
             flexDirection: "column",
-            background: "var(--hierro-800)",
-            border: "1px solid var(--ceniza-700)",
+            background: "var(--fondo-elevado)",
+            border: "1px solid var(--borde)",
             borderRadius: "var(--radius-md)",
             marginBottom: 12,
             overflow: "hidden",
@@ -60,7 +60,7 @@ export default function Chatbot() {
           <div
             style={{
               padding: "12px 16px",
-              borderBottom: "1px solid var(--ceniza-700)",
+              borderBottom: "1px solid var(--borde)",
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
@@ -82,9 +82,9 @@ export default function Chatbot() {
                 key={i}
                 style={{
                   alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-                  background: m.role === "user" ? "var(--ascua-500)" : "var(--hierro-950)",
-                  border: m.role === "user" ? "none" : "1px solid var(--ceniza-700)",
-                  color: "var(--hueso-100)",
+                  background: m.role === "user" ? "var(--ascua-500)" : "var(--fondo)",
+                  border: m.role === "user" ? "none" : "1px solid var(--borde)",
+                  color: "var(--texto)",
                   padding: "8px 12px",
                   borderRadius: "var(--radius-sm)",
                   fontSize: "0.88rem",
@@ -94,11 +94,11 @@ export default function Chatbot() {
                 {m.content}
               </div>
             ))}
-            {enviando && <div style={{ color: "var(--ceniza-500)", fontSize: "0.82rem" }}>escribiendo…</div>}
+            {enviando && <div style={{ color: "var(--texto-tenue)", fontSize: "0.82rem" }}>escribiendo…</div>}
             <div ref={finRef} />
           </div>
 
-          <form onSubmit={enviar} style={{ display: "flex", borderTop: "1px solid var(--ceniza-700)" }}>
+          <form onSubmit={enviar} style={{ display: "flex", borderTop: "1px solid var(--borde)" }}>
             <input
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
@@ -106,8 +106,8 @@ export default function Chatbot() {
               style={{
                 flex: 1,
                 border: "none",
-                background: "var(--hierro-950)",
-                color: "var(--hueso-100)",
+                background: "var(--fondo)",
+                color: "var(--texto)",
                 padding: "12px 14px",
                 fontSize: "0.9rem",
               }}
@@ -115,7 +115,7 @@ export default function Chatbot() {
             <button
               type="submit"
               disabled={enviando}
-              style={{ background: "var(--ascua-500)", border: "none", color: "var(--hueso-100)", padding: "0 18px", fontWeight: 600 }}
+              style={{ background: "var(--ascua-500)", border: "none", color: "var(--texto)", padding: "0 18px", fontWeight: 600 }}
             >
               Enviar
             </button>
@@ -131,9 +131,9 @@ export default function Chatbot() {
           height: 58,
           borderRadius: "50%",
           background: "var(--ascua-500)",
-          border: "3px solid var(--hierro-950)",
+          border: "3px solid var(--fondo)",
           boxShadow: "0 6px 18px rgba(0,0,0,0.45)",
-          color: "var(--hueso-100)",
+          color: "var(--texto)",
           fontSize: "1.4rem",
           display: "flex",
           alignItems: "center",

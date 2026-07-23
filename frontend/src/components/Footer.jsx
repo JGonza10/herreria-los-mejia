@@ -1,6 +1,6 @@
 export default function Footer() {
   return (
-    <footer id="contacto" style={{ padding: "56px 0 40px", borderTop: "1px solid var(--ceniza-700)" }}>
+    <footer id="contacto" style={{ padding: "56px 0 40px", borderTop: "1px solid var(--borde)" }}>
       <div
         className="contenedor"
         style={{
@@ -12,13 +12,13 @@ export default function Footer() {
       >
         <div>
           <span className="display" style={{ fontSize: "1.3rem" }}>LOS MEJÍA</span>
-          <p style={{ color: "var(--ceniza-500)", marginTop: 8, maxWidth: 320, fontSize: "0.9rem" }}>
+          <p style={{ color: "var(--texto-tenue)", marginTop: 8, maxWidth: 320, fontSize: "0.9rem" }}>
             Herrería de hierro, aluminio y vidrio. Trabajo a la medida, hecho en taller.
           </p>
         </div>
 
         <div>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", color: "var(--ceniza-500)", textTransform: "uppercase" }}>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", color: "var(--texto-tenue)", textTransform: "uppercase" }}>
             Síguenos
           </span>
           <div style={{ display: "flex", gap: 16, marginTop: 10 }}>
@@ -29,7 +29,7 @@ export default function Footer() {
         </div>
 
         <div>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", color: "var(--ceniza-500)", textTransform: "uppercase" }}>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", color: "var(--texto-tenue)", textTransform: "uppercase" }}>
             Contacto
           </span>
           <p style={{ marginTop: 10, fontSize: "0.9rem" }}>contacto@losmejia.com</p>
@@ -37,7 +37,7 @@ export default function Footer() {
         </div>
       </div>
 
-      <p style={{ textAlign: "center", color: "var(--ceniza-700)", fontSize: "0.78rem", marginTop: 40 }}>
+      <p style={{ textAlign: "center", color: "var(--borde)", fontSize: "0.78rem", marginTop: 40 }}>
         © {new Date().getFullYear()} Herrería Los Mejía. Todos los derechos reservados.
       </p>
     </footer>

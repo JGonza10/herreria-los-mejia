@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { API_BASE } from "../config.js";
+import { api } from "../api.js";
 
 const MATERIALES = [
   { valor: "", etiqueta: "Todos" },
@@ -14,7 +14,7 @@ const COLOR_MATERIAL = {
   vidrio: "var(--vidrio-400)",
 };
 
-export default function Catalogo() {
+export default function Catalogo({ onCotizarProducto }) {
   const [material, setMaterial] = useState("");
   const [productos, setProductos] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -24,8 +24,8 @@ export default function Catalogo() {
     setCargando(true);
     setError(null);
     const query = material ? `?material=${material}` : "";
-    fetch(`${API_BASE}/api/catalogo${query}`)
-      .then((r) => r.json())
+    api
+      .get(`/api/catalogo${query}`)
       .then(setProductos)
       .catch(() => setError("No se pudo cargar el catálogo. Intenta de nuevo más tarde."))
       .finally(() => setCargando(false));
@@ -48,9 +48,9 @@ export default function Catalogo() {
               style={{
                 padding: "9px 18px",
                 borderRadius: 999,
-                border: `1px solid ${material === m.valor ? "var(--ascua-500)" : "var(--ceniza-700)"}`,
+                border: `1px solid ${material === m.valor ? "var(--ascua-500)" : "var(--borde)"}`,
                 background: material === m.valor ? "var(--ascua-500)" : "transparent",
-                color: "var(--hueso-100)",
+                color: material === m.valor ? "#fff" : "var(--texto)",
                 fontSize: "0.88rem",
                 fontWeight: 600,
               }}
@@ -61,7 +61,7 @@ export default function Catalogo() {
         </div>
 
         {error && <p style={{ color: "var(--ascua-400)", marginTop: 24 }}>{error}</p>}
-        {cargando && <p style={{ color: "var(--ceniza-500)", marginTop: 24 }}>Cargando catálogo…</p>}
+        {cargando && <p style={{ color: "var(--texto-tenue)", marginTop: 24 }}>Cargando catálogo…</p>}
 
         {!cargando && !error && (
           <div
@@ -76,42 +76,77 @@ export default function Catalogo() {
               <article
                 key={p.id}
                 style={{
-                  background: "var(--hierro-800)",
-                  border: "1px solid var(--ceniza-700)",
+                  background: "var(--fondo-elevado)",
+                  border: "1px solid var(--borde)",
                   borderRadius: "var(--radius-md)",
-                  padding: 22,
-                  borderTop: `3px solid ${COLOR_MATERIAL[p.material] || "var(--ceniza-700)"}`,
+                  overflow: "hidden",
+                  borderTop: `3px solid ${COLOR_MATERIAL[p.material] || "var(--borde)"}`,
+                  display: "flex",
+                  flexDirection: "column",
                 }}
               >
-                <span
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: "0.7rem",
-                    letterSpacing: "0.1em",
-                    textTransform: "uppercase",
-                    color: COLOR_MATERIAL[p.material],
-                  }}
-                >
-                  {p.material}
-                </span>
-                <h3 style={{ fontSize: "1.3rem", marginTop: 10 }}>{p.nombre}</h3>
-                <p style={{ color: "var(--aluminio-300)", fontSize: "0.92rem", marginTop: 8 }}>
-                  {p.descripcion}
-                </p>
-                <p
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    marginTop: 16,
-                    fontSize: "1rem",
-                    color: "var(--hueso-100)",
-                  }}
-                >
-                  Desde ${p.precio_referencia_m2.toLocaleString("es-MX")} / m²
-                </p>
+                {p.imagen_url ? (
+                  <img
+                    src={p.imagen_url}
+                    alt={p.nombre}
+                    style={{ width: "100%", height: 160, objectFit: "cover" }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: "100%",
+                      height: 160,
+                      background: "var(--fondo-sutil)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "var(--texto-tenue)",
+                      fontSize: "0.8rem",
+                    }}
+                  >
+                    Sin imagen todavía
+                  </div>
+                )}
+                <div style={{ padding: 22, flex: 1, display: "flex", flexDirection: "column" }}>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: "0.7rem",
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      color: COLOR_MATERIAL[p.material],
+                    }}
+                  >
+                    {p.material}
+                  </span>
+                  <h3 style={{ fontSize: "1.3rem", marginTop: 10 }}>{p.nombre}</h3>
+                  <p style={{ color: "var(--aluminio-300)", fontSize: "0.92rem", marginTop: 8, flex: 1 }}>
+                    {p.descripcion}
+                  </p>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: "1rem" }}>
+                      Desde ${p.precio_referencia_m2.toLocaleString("es-MX")} / m²
+                    </span>
+                    <button
+                      onClick={() => onCotizarProducto?.(p)}
+                      style={{
+                        background: "none",
+                        border: "1px solid var(--ascua-500)",
+                        color: "var(--ascua-400)",
+                        borderRadius: "var(--radius-sm)",
+                        padding: "6px 12px",
+                        fontSize: "0.82rem",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Cotizar
+                    </button>
+                  </div>
+                </div>
               </article>
             ))}
             {productos.length === 0 && (
-              <p style={{ color: "var(--ceniza-500)" }}>No hay productos para este material todavía.</p>
+              <p style={{ color: "var(--texto-tenue)" }}>No hay productos para este material todavía.</p>
             )}
           </div>
         )}

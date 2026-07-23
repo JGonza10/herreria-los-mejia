@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from extensions import db
-from models import PrecioMaterial, Cotizacion
+from models import PrecioMaterial, Cotizacion, Producto
+from auth import usuario_actual
 
 cotizador_bp = Blueprint("cotizador", __name__)
 
@@ -46,11 +47,19 @@ def calcular():
 
 @cotizador_bp.post("/solicitar")
 def solicitar_cotizacion():
+    """Crea una cotización. Puede venir de un visitante (sin sesión) o de un
+    cliente logueado — en ese caso se liga a su cuenta automáticamente.
+    Si trae producto_id, es una cotización basada en un modelo del catálogo;
+    si no, es una propuesta personalizada (material + medidas libres)."""
     data = request.get_json(force=True)
     required = ["nombre_cliente", "telefono", "material", "ancho_m", "alto_m"]
     faltantes = [campo for campo in required if campo not in data]
     if faltantes:
         return jsonify({"error": f"Faltan campos: {', '.join(faltantes)}"}), 400
+
+    producto_id = data.get("producto_id")
+    if producto_id and not Producto.query.get(producto_id):
+        return jsonify({"error": "El producto seleccionado no existe."}), 400
 
     try:
         ancho_m = float(data["ancho_m"])
@@ -60,7 +69,11 @@ def solicitar_cotizacion():
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
+    usuario = usuario_actual()
+
     cotizacion = Cotizacion(
+        cliente_id=usuario.id if usuario else None,
+        producto_id=producto_id,
         nombre_cliente=data["nombre_cliente"],
         telefono=data["telefono"],
         email=data.get("email"),
@@ -76,10 +89,3 @@ def solicitar_cotizacion():
     db.session.commit()
 
     return jsonify(cotizacion.to_dict()), 201
-
-
-@cotizador_bp.get("/solicitudes")
-def listar_solicitudes():
-    """Para uso administrativo interno: ver las cotizaciones recibidas."""
-    cotizaciones = Cotizacion.query.order_by(Cotizacion.creado_en.desc()).all()
-    return jsonify([c.to_dict() for c in cotizaciones])

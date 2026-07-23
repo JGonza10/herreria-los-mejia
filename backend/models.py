@@ -1,5 +1,39 @@
 from datetime import datetime
 from extensions import db
+from werkzeug.security import generate_password_hash, check_password_hash
+
+ROLES = ("administrador", "trabajador", "cliente")
+ESTADOS_COTIZACION = ("nueva", "revisada", "aprobada", "rechazada")
+ESTADOS_PROYECTO = ("pendiente", "en_proceso", "terminado", "entregado", "cancelado")
+
+
+class Usuario(db.Model):
+    __tablename__ = "usuarios"
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(120), nullable=False)
+    email = db.Column(db.String(160), unique=True, nullable=False)
+    telefono = db.Column(db.String(30), nullable=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    rol = db.Column(db.String(20), nullable=False, default="cliente")
+    activo = db.Column(db.Boolean, default=True)
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "nombre": self.nombre,
+            "email": self.email,
+            "telefono": self.telefono,
+            "rol": self.rol,
+            "activo": self.activo,
+        }
 
 
 class Producto(db.Model):
@@ -12,6 +46,7 @@ class Producto(db.Model):
     precio_referencia_m2 = db.Column(db.Numeric(10, 2), nullable=False)
     imagen_url = db.Column(db.String(300), nullable=True)
     destacado = db.Column(db.Boolean, default=False)
+    activo = db.Column(db.Boolean, default=True)
     creado_en = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
@@ -23,6 +58,7 @@ class Producto(db.Model):
             "precio_referencia_m2": float(self.precio_referencia_m2),
             "imagen_url": self.imagen_url,
             "destacado": self.destacado,
+            "activo": self.activo,
         }
 
 
@@ -31,7 +67,7 @@ class PrecioMaterial(db.Model):
     __tablename__ = "precios_material"
 
     id = db.Column(db.Integer, primary_key=True)
-    material = db.Column(db.String(20), unique=True, nullable=False)  # hierro | aluminio | vidrio
+    material = db.Column(db.String(20), unique=True, nullable=False)
     precio_base_m2 = db.Column(db.Numeric(10, 2), nullable=False)
     precio_acabado_extra_m2 = db.Column(db.Numeric(10, 2), default=0)
 
@@ -47,6 +83,9 @@ class Cotizacion(db.Model):
     __tablename__ = "cotizaciones"
 
     id = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=True)
+    producto_id = db.Column(db.Integer, db.ForeignKey("productos.id"), nullable=True)
+
     nombre_cliente = db.Column(db.String(120), nullable=False)
     telefono = db.Column(db.String(30), nullable=False)
     email = db.Column(db.String(120), nullable=True)
@@ -57,12 +96,18 @@ class Cotizacion(db.Model):
     metros_cuadrados = db.Column(db.Numeric(8, 2), nullable=False)
     precio_estimado = db.Column(db.Numeric(10, 2), nullable=False)
     notas = db.Column(db.Text, nullable=True)
-    estado = db.Column(db.String(20), default="nueva")  # nueva | contactado | cerrada
+    estado = db.Column(db.String(20), default="nueva")
     creado_en = db.Column(db.DateTime, default=datetime.utcnow)
+
+    producto = db.relationship("Producto")
+    proyecto = db.relationship("Proyecto", back_populates="cotizacion", uselist=False)
 
     def to_dict(self):
         return {
             "id": self.id,
+            "cliente_id": self.cliente_id,
+            "producto_id": self.producto_id,
+            "producto_nombre": self.producto.nombre if self.producto else None,
             "nombre_cliente": self.nombre_cliente,
             "telefono": self.telefono,
             "email": self.email,
@@ -74,5 +119,47 @@ class Cotizacion(db.Model):
             "precio_estimado": float(self.precio_estimado),
             "notas": self.notas,
             "estado": self.estado,
+            "tiene_proyecto": self.proyecto is not None,
             "creado_en": self.creado_en.isoformat(),
+        }
+
+
+class Proyecto(db.Model):
+    """Un pedido en curso, generado al aprobar una cotización."""
+    __tablename__ = "proyectos"
+
+    id = db.Column(db.Integer, primary_key=True)
+    cotizacion_id = db.Column(db.Integer, db.ForeignKey("cotizaciones.id"), nullable=False)
+    cliente_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=True)
+    trabajador_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=True)
+
+    titulo = db.Column(db.String(160), nullable=False)
+    estado = db.Column(db.String(20), default="pendiente")
+    avance_porcentaje = db.Column(db.Integer, default=0)
+    notas_internas = db.Column(db.Text, nullable=True)
+    fecha_estimada_entrega = db.Column(db.Date, nullable=True)
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow)
+    actualizado_en = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    cotizacion = db.relationship("Cotizacion", back_populates="proyecto")
+    cliente = db.relationship("Usuario", foreign_keys=[cliente_id])
+    trabajador = db.relationship("Usuario", foreign_keys=[trabajador_id])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "cotizacion_id": self.cotizacion_id,
+            "cliente_id": self.cliente_id,
+            "cliente_nombre": self.cliente.nombre if self.cliente else self.cotizacion.nombre_cliente,
+            "trabajador_id": self.trabajador_id,
+            "trabajador_nombre": self.trabajador.nombre if self.trabajador else None,
+            "titulo": self.titulo,
+            "estado": self.estado,
+            "avance_porcentaje": self.avance_porcentaje,
+            "notas_internas": self.notas_internas,
+            "fecha_estimada_entrega": self.fecha_estimada_entrega.isoformat() if self.fecha_estimada_entrega else None,
+            "creado_en": self.creado_en.isoformat(),
+            "actualizado_en": self.actualizado_en.isoformat(),
+            "material": self.cotizacion.material,
+            "precio_estimado": float(self.cotizacion.precio_estimado),
         }

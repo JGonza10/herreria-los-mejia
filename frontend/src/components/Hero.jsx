@@ -5,7 +5,7 @@ export default function Hero() {
       style={{
         position: "relative",
         overflow: "hidden",
-        borderBottom: "1px solid var(--ceniza-700)",
+        borderBottom: "1px solid var(--borde)",
       }}
     >
       {/* Patrón de fondo: silueta de reja forjada */}

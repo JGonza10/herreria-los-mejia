@@ -8,7 +8,7 @@ catalogo_bp = Blueprint("catalogo", __name__)
 @catalogo_bp.get("")
 def listar_productos():
     material = request.args.get("material")  # hierro | aluminio | vidrio | None
-    query = Producto.query
+    query = Producto.query.filter_by(activo=True)
     if material:
         query = query.filter_by(material=material)
     productos = query.order_by(Producto.destacado.desc(), Producto.id.asc()).all()

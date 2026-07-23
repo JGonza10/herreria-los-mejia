@@ -1,10 +1,14 @@
 """
-Llena la base de datos con precios base por material y un catálogo de ejemplo.
-Ejecutar una sola vez: python seed.py
+Llena la base de datos con precios base, catálogo de ejemplo y usuarios de
+prueba (uno por cada rol). Ejecutar una sola vez: python seed.py
+
+IMPORTANTE: cambia las contraseñas de ejemplo antes de usar el sitio con
+clientes reales — puedes hacerlo desde el panel de administrador o
+directamente en la base de datos.
 """
 from app import create_app
 from extensions import db
-from models import PrecioMaterial, Producto
+from models import PrecioMaterial, Producto, Usuario
 
 app = create_app()
 
@@ -74,5 +78,19 @@ with app.app_context():
         for prod in PRODUCTOS:
             db.session.add(Producto(**prod))
 
+    USUARIOS_EJEMPLO = [
+        {"nombre": "Admin Los Mejía", "email": "admin@losmejia.com", "password": "cambiar123", "rol": "administrador"},
+        {"nombre": "Trabajador Ejemplo", "email": "trabajador@losmejia.com", "password": "cambiar123", "rol": "trabajador"},
+        {"nombre": "Cliente Ejemplo", "email": "cliente@losmejia.com", "password": "cambiar123", "rol": "cliente"},
+    ]
+    for datos in USUARIOS_EJEMPLO:
+        if not Usuario.query.filter_by(email=datos["email"]).first():
+            usuario = Usuario(nombre=datos["nombre"], email=datos["email"], rol=datos["rol"])
+            usuario.set_password(datos["password"])
+            db.session.add(usuario)
+
     db.session.commit()
     print("Datos de ejemplo cargados correctamente.")
+    print("Usuarios de prueba (cambia las contraseñas antes de producción):")
+    for datos in USUARIOS_EJEMPLO:
+        print(f"  {datos['rol']}: {datos['email']} / {datos['password']}")

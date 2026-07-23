@@ -1,16 +1,17 @@
-:root {
-  /* Paleta — forja de hierro, aluminio y vidrio */
-  --hierro-950: #17140f;
-  --hierro-900: #1e1a14;
-  --hierro-800: #2b251c;
-  --ceniza-700: #4a4038;
-  --ceniza-500: #7a6d5f;
+:root,
+[data-theme="dark"] {
+  /* Paleta — forja de hierro, aluminio y vidrio (tema oscuro, default) */
+  --fondo: #17140f;
+  --fondo-elevado: #2b251c;
+  --fondo-sutil: #1e1a14;
+  --borde: #4a4038;
+  --texto-tenue: #7a6d5f;
   --ascua-500: #e8622c;
   --ascua-400: #f2874f;
   --aluminio-300: #c9cfd3;
   --aluminio-100: #e7eaec;
   --vidrio-400: #7fb9c2;
-  --hueso-100: #f3eee6;
+  --texto: #f3eee6;
 
   --font-display: "Big Shoulders Display", sans-serif;
   --font-body: "Work Sans", sans-serif;
@@ -18,6 +19,25 @@
 
   --radius-sm: 3px;
   --radius-md: 6px;
+
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  /* Tema claro — misma identidad, fondo taller/planos de trabajo */
+  --fondo: #f4f1ea;
+  --fondo-elevado: #ffffff;
+  --fondo-sutil: #e9e3d6;
+  --borde: #d8d0bf;
+  --texto-tenue: #8a7f6c;
+  --ascua-500: #d9531f;
+  --ascua-400: #e8622c;
+  --aluminio-300: #5c6166;
+  --aluminio-100: #3a3d40;
+  --vidrio-400: #2f7f8c;
+  --texto: #211d16;
+
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -26,11 +46,12 @@ html { scroll-behavior: smooth; }
 
 body {
   margin: 0;
-  background: var(--hierro-950);
-  color: var(--hueso-100);
+  background: var(--fondo);
+  color: var(--texto);
   font-family: var(--font-body);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 h1, h2, h3, .display {
@@ -39,7 +60,7 @@ h1, h2, h3, .display {
   letter-spacing: 0.01em;
   text-transform: uppercase;
   margin: 0;
-  color: var(--hueso-100);
+  color: var(--texto);
 }
 
 a { color: inherit; }
@@ -75,14 +96,14 @@ button {
 
 .boton-ascua {
   background: var(--ascua-500);
-  color: var(--hueso-100);
+  color: var(--texto);
 }
 .boton-ascua:hover { background: var(--ascua-400); }
 
 .boton-borde {
   background: transparent;
-  border-color: var(--ceniza-500);
-  color: var(--hueso-100);
+  border-color: var(--texto-tenue);
+  color: var(--texto);
 }
 .boton-borde:hover { border-color: var(--aluminio-300); }
 
@@ -93,7 +114,7 @@ button {
   display: block;
 }
 .cordon-soldadura path {
-  stroke: var(--ceniza-700);
+  stroke: var(--borde);
   stroke-width: 2;
   fill: none;
   stroke-dasharray: 6 5;
@@ -109,6 +130,10 @@ button {
   0% { opacity: 0; r: 1; }
   15% { opacity: 1; }
   100% { opacity: 0; r: 3; }
+}
+
+@media (max-width: 720px) {
+  .ocultar-movil { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
