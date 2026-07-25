@@ -8,8 +8,12 @@ export default function AdminUsuarios() {
   const [form, setForm] = useState(VACIO);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState(null);
+  const [errorCarga, setErrorCarga] = useState(null);
 
-  const cargar = () => api.get("/api/admin/usuarios").then(setUsuarios).catch(() => {});
+  const cargar = () =>
+    api.get("/api/admin/usuarios")
+      .then((data) => { setUsuarios(data); setErrorCarga(null); })
+      .catch((err) => setErrorCarga(err.message));
 
   useEffect(() => { cargar(); }, []);
 
@@ -47,6 +51,7 @@ export default function AdminUsuarios() {
       </form>
 
       <h2 style={{ fontSize: "1.6rem", marginBottom: 18 }}>Equipo ({usuarios.length})</h2>
+      {errorCarga && <p style={{ color: "var(--ascua-400)", marginBottom: 14 }}>{errorCarga}</p>}
       <div style={{ display: "grid", gap: 10 }}>
         {usuarios.map((u) => (
           <div key={u.id} style={{ display: "flex", justifyContent: "space-between", border: "1px solid var(--borde)", borderRadius: "var(--radius-sm)", padding: "12px 16px", background: "var(--fondo-elevado)" }}>

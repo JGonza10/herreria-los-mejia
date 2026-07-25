@@ -9,8 +9,12 @@ export default function AdminCatalogo() {
   const [archivo, setArchivo] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState(null);
+  const [errorCarga, setErrorCarga] = useState(null);
 
-  const cargar = () => api.get("/api/admin/productos").then(setProductos).catch(() => {});
+  const cargar = () =>
+    api.get("/api/admin/productos")
+      .then((data) => { setProductos(data); setErrorCarga(null); })
+      .catch((err) => setErrorCarga(err.message));
 
   useEffect(() => { cargar(); }, []);
 
@@ -96,6 +100,7 @@ export default function AdminCatalogo() {
       </form>
 
       <h2 style={{ fontSize: "1.6rem", marginBottom: 18 }}>Productos ({productos.length})</h2>
+      {errorCarga && <p style={{ color: "var(--ascua-400)", marginBottom: 14 }}>{errorCarga}</p>}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
         {productos.map((p) => (
           <div key={p.id} style={{ border: "1px solid var(--borde)", borderRadius: "var(--radius-md)", overflow: "hidden", background: "var(--fondo-elevado)" }}>
