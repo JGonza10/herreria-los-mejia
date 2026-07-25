@@ -1,0 +1,251 @@
+diff --git a/backend/app.py b/backend/app.py
+index 7b181a6..83e33cf 100644
+--- a/backend/app.py
++++ b/backend/app.py
+@@ -27,16 +27,10 @@ def create_app():
+     app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+ 
+-    # Sesión de login (cookie firmada). SECRET_KEY debe fijarse en producción
+-    # vía variable de entorno para que las sesiones no se invaliden en cada deploy.
++    # SECRET_KEY firma los tokens de autenticación (ver auth.py). Debe
++    # fijarse en producción vía variable de entorno para que los tokens no
++    # se invaliden en cada deploy.
+     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "clave-de-desarrollo-cambiar-en-produccion")
+-    app.config["SESSION_COOKIE_SAMESITE"] = "None"
+-    # Cualquiera de estas variables confirma que estamos en Railway (nombres
+-    # de variables de sistema que Railway inyecta automáticamente).
+-    en_railway = any(
+-        os.environ.get(var) for var in ("RAILWAY_ENVIRONMENT", "RAILWAY_ENVIRONMENT_NAME", "RAILWAY_PROJECT_ID")
+-    )
+-    app.config["SESSION_COOKIE_SECURE"] = en_railway
+ 
+     # Carpeta donde se guardan las imágenes del catálogo.
+     # NOTA: el disco de Railway es efímero salvo que agregues un Volume
+diff --git a/backend/auth.py b/backend/auth.py
+index 3a232b2..c74f6e9 100644
+--- a/backend/auth.py
++++ b/backend/auth.py
+@@ -1,13 +1,43 @@
+ from functools import wraps
+-from flask import session, jsonify
++from flask import request, jsonify, current_app
++from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+ from models import Usuario
+ 
++# Duración del token: 30 días. Como el frontend y el backend viven en
++# dominios distintos de Railway, los navegadores (Chrome, Safari, Firefox)
++# bloquean la cookie de sesión por ser "de terceros" (cross-site), sin
++# importar que SameSite=None/Secure estén bien puestos. Por eso la sesión
++# ya NO se maneja con cookie: el login regresa un token firmado que el
++# frontend guarda (localStorage) y manda en cada petición como
++# "Authorization: Bearer <token>". Esto funciona igual sin importar el
++# dominio, porque no depende de políticas de cookies del navegador.
++TOKEN_MAX_AGE = 60 * 60 * 24 * 30
++
++
++def _serializer():
++    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="auth-token")
++
++
++def generar_token(usuario_id):
++    return _serializer().dumps({"user_id": usuario_id})
++
++
++def _token_de_request():
++    encabezado = request.headers.get("Authorization", "")
++    if encabezado.startswith("Bearer "):
++        return encabezado[len("Bearer "):].strip()
++    return None
++
+ 
+ def usuario_actual():
+-    user_id = session.get("user_id")
+-    if not user_id:
++    token = _token_de_request()
++    if not token:
++        return None
++    try:
++        datos = _serializer().loads(token, max_age=TOKEN_MAX_AGE)
++    except (BadSignature, SignatureExpired):
+         return None
+-    return Usuario.query.get(user_id)
++    return Usuario.query.get(datos.get("user_id"))
+ 
+ 
+ def requiere_login(f):
+diff --git a/backend/requirements.txt b/backend/requirements.txt
+index 08144fd..e76a727 100644
+--- a/backend/requirements.txt
++++ b/backend/requirements.txt
+@@ -1,4 +1,5 @@
+ Flask==3.0.3
++itsdangerous==2.2.0
+ Flask-SQLAlchemy==3.1.1
+ Flask-Cors==4.0.1
+ psycopg[binary]==3.2.3
+diff --git a/backend/routes/auth.py b/backend/routes/auth.py
+index 4b21983..48f456a 100644
+--- a/backend/routes/auth.py
++++ b/backend/routes/auth.py
+@@ -1,7 +1,7 @@
+-from flask import Blueprint, jsonify, request, session
++from flask import Blueprint, jsonify, request
+ from extensions import db
+ from models import Usuario
+-from auth import usuario_actual, requiere_login
++from auth import usuario_actual, generar_token
+ 
+ auth_bp = Blueprint("auth", __name__)
+ 
+@@ -29,8 +29,8 @@ def registro():
+     db.session.add(usuario)
+     db.session.commit()
+ 
+-    session["user_id"] = usuario.id
+-    return jsonify(usuario.to_dict()), 201
++    token = generar_token(usuario.id)
++    return jsonify({**usuario.to_dict(), "token": token}), 201
+ 
+ 
+ @auth_bp.post("/login")
+@@ -43,13 +43,14 @@ def login():
+     if not usuario or not usuario.check_password(password) or not usuario.activo:
+         return jsonify({"error": "Email o contraseña incorrectos."}), 401
+ 
+-    session["user_id"] = usuario.id
+-    return jsonify(usuario.to_dict())
++    token = generar_token(usuario.id)
++    return jsonify({**usuario.to_dict(), "token": token})
+ 
+ 
+ @auth_bp.post("/logout")
+ def logout():
+-    session.pop("user_id", None)
++    # El token es sin estado: "cerrar sesión" consiste en que el frontend lo
++    # borre de su almacenamiento local. No hay nada que invalidar aquí.
+     return jsonify({"ok": True})
+ 
+ 
+diff --git a/frontend/src/api.js b/frontend/src/api.js
+index 20b7195..3fda38a 100644
+--- a/frontend/src/api.js
++++ b/frontend/src/api.js
+@@ -1,5 +1,12 @@
+ import { API_BASE } from "./config.js";
+ 
++const CLAVE_TOKEN = "token";
++
++function headersAuth(extra = {}) {
++  const token = localStorage.getItem(CLAVE_TOKEN);
++  return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
++}
++
+ async function manejarRespuesta(r) {
+   const contentType = r.headers.get("content-type") || "";
+   const data = contentType.includes("application/json") ? await r.json() : null;
+@@ -11,31 +18,29 @@ async function manejarRespuesta(r) {
+ 
+ export const api = {
+   get: (ruta) =>
+-    fetch(`${API_BASE}${ruta}`, { credentials: "include" }).then(manejarRespuesta),
++    fetch(`${API_BASE}${ruta}`, { headers: headersAuth() }).then(manejarRespuesta),
+ 
+   post: (ruta, body) =>
+     fetch(`${API_BASE}${ruta}`, {
+       method: "POST",
+-      credentials: "include",
+-      headers: { "Content-Type": "application/json" },
++      headers: headersAuth({ "Content-Type": "application/json" }),
+       body: JSON.stringify(body),
+     }).then(manejarRespuesta),
+ 
+   put: (ruta, body) =>
+     fetch(`${API_BASE}${ruta}`, {
+       method: "PUT",
+-      credentials: "include",
+-      headers: { "Content-Type": "application/json" },
++      headers: headersAuth({ "Content-Type": "application/json" }),
+       body: JSON.stringify(body),
+     }).then(manejarRespuesta),
+ 
+   del: (ruta) =>
+-    fetch(`${API_BASE}${ruta}`, { method: "DELETE", credentials: "include" }).then(manejarRespuesta),
++    fetch(`${API_BASE}${ruta}`, { method: "DELETE", headers: headersAuth() }).then(manejarRespuesta),
+ 
+   /** Para form-data (subida de imágenes) */
+   postForm: (ruta, formData) =>
+-    fetch(`${API_BASE}${ruta}`, { method: "POST", credentials: "include", body: formData }).then(manejarRespuesta),
++    fetch(`${API_BASE}${ruta}`, { method: "POST", headers: headersAuth(), body: formData }).then(manejarRespuesta),
+ 
+   putForm: (ruta, formData) =>
+-    fetch(`${API_BASE}${ruta}`, { method: "PUT", credentials: "include", body: formData }).then(manejarRespuesta),
++    fetch(`${API_BASE}${ruta}`, { method: "PUT", headers: headersAuth(), body: formData }).then(manejarRespuesta),
+ };
+diff --git a/frontend/src/context/AuthContext.jsx b/frontend/src/context/AuthContext.jsx
+index e112dce..692a236 100644
+--- a/frontend/src/context/AuthContext.jsx
++++ b/frontend/src/context/AuthContext.jsx
+@@ -2,16 +2,26 @@ import { createContext, useContext, useEffect, useState } from "react";
+ import { API_BASE } from "../config.js";
+ 
+ const AuthContext = createContext(null);
++const CLAVE_TOKEN = "token";
+ 
+ export function AuthProvider({ children }) {
+   const [usuario, setUsuario] = useState(null);
+   const [cargando, setCargando] = useState(true);
+ 
+   const cargarUsuario = async () => {
++    const token = localStorage.getItem(CLAVE_TOKEN);
++    if (!token) {
++      setUsuario(null);
++      setCargando(false);
++      return;
++    }
+     try {
+-      const r = await fetch(`${API_BASE}/api/auth/yo`, { credentials: "include" });
++      const r = await fetch(`${API_BASE}/api/auth/yo`, {
++        headers: { Authorization: `Bearer ${token}` },
++      });
+       const data = await r.json();
+       setUsuario(data.usuario);
++      if (!data.usuario) localStorage.removeItem(CLAVE_TOKEN);
+     } catch {
+       setUsuario(null);
+     } finally {
+@@ -26,12 +36,12 @@ export function AuthProvider({ children }) {
+   const login = async (email, password) => {
+     const r = await fetch(`${API_BASE}/api/auth/login`, {
+       method: "POST",
+-      credentials: "include",
+       headers: { "Content-Type": "application/json" },
+       body: JSON.stringify({ email, password }),
+     });
+     const data = await r.json();
+     if (!r.ok) throw new Error(data.error || "No se pudo iniciar sesión.");
++    localStorage.setItem(CLAVE_TOKEN, data.token);
+     setUsuario(data);
+     return data;
+   };
+@@ -39,18 +49,18 @@ export function AuthProvider({ children }) {
+   const registro = async ({ nombre, email, telefono, password }) => {
+     const r = await fetch(`${API_BASE}/api/auth/registro`, {
+       method: "POST",
+-      credentials: "include",
+       headers: { "Content-Type": "application/json" },
+       body: JSON.stringify({ nombre, email, telefono, password }),
+     });
+     const data = await r.json();
+     if (!r.ok) throw new Error(data.error || "No se pudo crear la cuenta.");
++    localStorage.setItem(CLAVE_TOKEN, data.token);
+     setUsuario(data);
+     return data;
+   };
+ 
+   const logout = async () => {
+-    await fetch(`${API_BASE}/api/auth/logout`, { method: "POST", credentials: "include" });
++    localStorage.removeItem(CLAVE_TOKEN);
+     setUsuario(null);
+   };
+ 

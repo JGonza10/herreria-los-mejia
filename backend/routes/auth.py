@@ -1,7 +1,7 @@
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, request
 from extensions import db
 from models import Usuario
-from auth import usuario_actual, requiere_login
+from auth import usuario_actual, generar_token
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -29,8 +29,8 @@ def registro():
     db.session.add(usuario)
     db.session.commit()
 
-    session["user_id"] = usuario.id
-    return jsonify(usuario.to_dict()), 201
+    token = generar_token(usuario.id)
+    return jsonify({**usuario.to_dict(), "token": token}), 201
 
 
 @auth_bp.post("/login")
@@ -43,13 +43,14 @@ def login():
     if not usuario or not usuario.check_password(password) or not usuario.activo:
         return jsonify({"error": "Email o contraseña incorrectos."}), 401
 
-    session["user_id"] = usuario.id
-    return jsonify(usuario.to_dict())
+    token = generar_token(usuario.id)
+    return jsonify({**usuario.to_dict(), "token": token})
 
 
 @auth_bp.post("/logout")
 def logout():
-    session.pop("user_id", None)
+    # El token es sin estado: "cerrar sesión" consiste en que el frontend lo
+    # borre de su almacenamiento local. No hay nada que invalidar aquí.
     return jsonify({"ok": True})
 
 

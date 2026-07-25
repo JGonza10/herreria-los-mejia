@@ -1,13 +1,43 @@
 from functools import wraps
-from flask import session, jsonify
+from flask import request, jsonify, current_app
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from models import Usuario
+
+# Duración del token: 30 días. Como el frontend y el backend viven en
+# dominios distintos de Railway, los navegadores (Chrome, Safari, Firefox)
+# bloquean la cookie de sesión por ser "de terceros" (cross-site), sin
+# importar que SameSite=None/Secure estén bien puestos. Por eso la sesión
+# ya NO se maneja con cookie: el login regresa un token firmado que el
+# frontend guarda (localStorage) y manda en cada petición como
+# "Authorization: Bearer <token>". Esto funciona igual sin importar el
+# dominio, porque no depende de políticas de cookies del navegador.
+TOKEN_MAX_AGE = 60 * 60 * 24 * 30
+
+
+def _serializer():
+    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="auth-token")
+
+
+def generar_token(usuario_id):
+    return _serializer().dumps({"user_id": usuario_id})
+
+
+def _token_de_request():
+    encabezado = request.headers.get("Authorization", "")
+    if encabezado.startswith("Bearer "):
+        return encabezado[len("Bearer "):].strip()
+    return None
 
 
 def usuario_actual():
-    user_id = session.get("user_id")
-    if not user_id:
+    token = _token_de_request()
+    if not token:
         return None
-    return Usuario.query.get(user_id)
+    try:
+        datos = _serializer().loads(token, max_age=TOKEN_MAX_AGE)
+    except (BadSignature, SignatureExpired):
+        return None
+    return Usuario.query.get(datos.get("user_id"))
 
 
 def requiere_login(f):

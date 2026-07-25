@@ -27,16 +27,10 @@ def create_app():
     app.config["SQLALCHEMY_DATABASE_URI"] = db_url
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-    # Sesión de login (cookie firmada). SECRET_KEY debe fijarse en producción
-    # vía variable de entorno para que las sesiones no se invaliden en cada deploy.
+    # SECRET_KEY firma los tokens de autenticación (ver auth.py). Debe
+    # fijarse en producción vía variable de entorno para que los tokens no
+    # se invaliden en cada deploy.
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "clave-de-desarrollo-cambiar-en-produccion")
-    app.config["SESSION_COOKIE_SAMESITE"] = "None"
-    # Cualquiera de estas variables confirma que estamos en Railway (nombres
-    # de variables de sistema que Railway inyecta automáticamente).
-    en_railway = any(
-        os.environ.get(var) for var in ("RAILWAY_ENVIRONMENT", "RAILWAY_ENVIRONMENT_NAME", "RAILWAY_PROJECT_ID")
-    )
-    app.config["SESSION_COOKIE_SECURE"] = en_railway
 
     # Carpeta donde se guardan las imágenes del catálogo.
     # NOTA: el disco de Railway es efímero salvo que agregues un Volume
