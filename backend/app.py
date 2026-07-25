@@ -16,8 +16,13 @@ def create_app():
     app = Flask(__name__)
 
     db_url = os.environ.get("DATABASE_URL", "sqlite:///local.db")
+    # Railway entrega postgres:// pero SQLAlchemy 1.4+ requiere postgresql://,
+    # y forzamos el driver psycopg (v3) en vez del psycopg2 por defecto, porque
+    # psycopg2-binary falla en el builder actual de Railway (libpq.so.5 no encontrado).
     if db_url.startswith("postgres://"):
-        db_url = db_url.replace("postgres://", "postgresql://", 1)
+        db_url = db_url.replace("postgres://", "postgresql+psycopg://", 1)
+    elif db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
 
     app.config["SQLALCHEMY_DATABASE_URI"] = db_url
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
