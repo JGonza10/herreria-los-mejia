@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Hero from "../components/Hero.jsx";
+import Beneficios from "../components/Beneficios.jsx";
 import CordonSoldadura from "../components/CordonSoldadura.jsx";
 import Catalogo from "../components/Catalogo.jsx";
 import Cotizador from "../components/Cotizador.jsx";
@@ -17,6 +18,7 @@ export default function SitioPublico() {
   return (
     <>
       <Hero />
+      <Beneficios />
       <CordonSoldadura />
       <Catalogo onCotizarProducto={irACotizar} />
       <CordonSoldadura />

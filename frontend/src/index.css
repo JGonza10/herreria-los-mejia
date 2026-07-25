@@ -134,6 +134,7 @@ button {
 
 @media (max-width: 720px) {
   .ocultar-movil { display: none; }
+  #inicio .contenedor { grid-template-columns: 1fr !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
