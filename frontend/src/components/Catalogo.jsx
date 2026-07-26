@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
+import { urlImagen } from "../config.js";
 
 const MATERIALES = [
   { valor: "", etiqueta: "Todos" },
@@ -87,7 +88,7 @@ export default function Catalogo({ onCotizarProducto }) {
               >
                 {p.imagen_url ? (
                   <img
-                    src={p.imagen_url}
+                    src={urlImagen(p.imagen_url)}
                     alt={p.nombre}
                     style={{ width: "100%", height: 160, objectFit: "cover" }}
                   />

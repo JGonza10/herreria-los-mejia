@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api.js";
+import { urlImagen } from "../../config.js";
 
 const VACIO = { id: null, nombre: "", material: "hierro", descripcion: "", precio_referencia_m2: "", destacado: false };
 
@@ -105,7 +106,7 @@ export default function AdminCatalogo() {
         {productos.map((p) => (
           <div key={p.id} style={{ border: "1px solid var(--borde)", borderRadius: "var(--radius-md)", overflow: "hidden", background: "var(--fondo-elevado)" }}>
             {p.imagen_url ? (
-              <img src={p.imagen_url} alt={p.nombre} style={{ width: "100%", height: 120, objectFit: "cover" }} />
+              <img src={urlImagen(p.imagen_url)} alt={p.nombre} style={{ width: "100%", height: 120, objectFit: "cover" }} />
             ) : (
               <div style={{ height: 120, background: "var(--fondo-sutil)" }} />
             )}
