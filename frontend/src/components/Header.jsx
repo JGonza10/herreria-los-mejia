@@ -28,7 +28,7 @@ export default function Header() {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            height: 36,
+            height: 44,
             flexWrap: "wrap",
             gap: 8,
           }}
@@ -40,7 +40,7 @@ export default function Header() {
           <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
             {usuario ? (
               <>
-                <Link to={RUTA_PANEL[usuario.rol] || "/"} style={{ textDecoration: "none" }}>
+                <Link to={RUTA_PANEL[usuario.rol] || "/"} style={{ textDecoration: "none", fontWeight: 700, color: "var(--texto)" }}>
                   Mi panel ({usuario.nombre.split(" ")[0]})
                 </Link>
                 <button
@@ -52,8 +52,22 @@ export default function Header() {
               </>
             ) : (
               <>
-                <Link to="/login" style={{ textDecoration: "none" }}>Iniciar sesión</Link>
-                <Link to="/registro" style={{ textDecoration: "none" }}>Crear cuenta</Link>
+                <Link to="/login" style={{ textDecoration: "none", fontWeight: 700, color: "var(--texto)" }}>
+                  Iniciar sesión
+                </Link>
+                <Link
+                  to="/registro"
+                  style={{
+                    textDecoration: "none",
+                    fontWeight: 700,
+                    color: "#fff",
+                    background: "var(--ascua-500)",
+                    padding: "6px 14px",
+                    borderRadius: 999,
+                  }}
+                >
+                  Crear cuenta
+                </Link>
               </>
             )}
           </div>

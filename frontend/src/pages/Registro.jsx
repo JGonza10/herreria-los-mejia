@@ -18,7 +18,8 @@ export default function Registro() {
     setError(null);
     try {
       await registro(form);
-      navegar("/cliente");
+      // Igual que en login: siempre a la portada.
+      navegar("/");
     } catch (err) {
       setError(err.message);
     } finally {

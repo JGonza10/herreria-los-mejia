@@ -6,15 +6,20 @@ from auth import usuario_actual
 cotizador_bp = Blueprint("cotizador", __name__)
 
 
-def calcular_precio(material: str, ancho_m: float, alto_m: float, con_acabado: bool):
-    precio = PrecioMaterial.query.filter_by(material=material).first()
-    if precio is None:
+def calcular_precio(material: str, ancho_m: float, alto_m: float, con_acabado: bool, producto: Producto = None):
+    """Si se pasa `producto` (modelo elegido del catálogo), se usa su propio
+    precio_referencia_m2 como base — cada modelo puede costar distinto aunque
+    sea del mismo material. Si no, se usa el precio genérico por material
+    (propuesta personalizada, sin modelo específico). El extra por acabado
+    especial siempre sale de la tabla genérica por material."""
+    precio_material = PrecioMaterial.query.filter_by(material=material).first()
+    if precio_material is None:
         raise ValueError(f"No hay precio configurado para el material '{material}'")
 
     m2 = round(ancho_m * alto_m, 2)
-    precio_m2 = float(precio.precio_base_m2)
+    precio_m2 = float(producto.precio_referencia_m2) if producto else float(precio_material.precio_base_m2)
     if con_acabado:
-        precio_m2 += float(precio.precio_acabado_extra_m2)
+        precio_m2 += float(precio_material.precio_acabado_extra_m2)
 
     total = round(m2 * precio_m2, 2)
     return m2, total
@@ -37,8 +42,15 @@ def calcular():
     except (KeyError, TypeError, ValueError):
         return jsonify({"error": "Datos inválidos. Se requiere material, ancho_m y alto_m."}), 400
 
+    producto = None
+    producto_id = data.get("producto_id")
+    if producto_id:
+        producto = Producto.query.get(producto_id)
+        if not producto:
+            return jsonify({"error": "El producto seleccionado no existe."}), 400
+
     try:
-        m2, total = calcular_precio(material, ancho_m, alto_m, con_acabado)
+        m2, total = calcular_precio(material, ancho_m, alto_m, con_acabado, producto)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
@@ -58,14 +70,15 @@ def solicitar_cotizacion():
         return jsonify({"error": f"Faltan campos: {', '.join(faltantes)}"}), 400
 
     producto_id = data.get("producto_id")
-    if producto_id and not Producto.query.get(producto_id):
+    producto = Producto.query.get(producto_id) if producto_id else None
+    if producto_id and not producto:
         return jsonify({"error": "El producto seleccionado no existe."}), 400
 
     try:
         ancho_m = float(data["ancho_m"])
         alto_m = float(data["alto_m"])
         con_acabado = bool(data.get("con_acabado", False))
-        m2, total = calcular_precio(data["material"], ancho_m, alto_m, con_acabado)
+        m2, total = calcular_precio(data["material"], ancho_m, alto_m, con_acabado, producto)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 

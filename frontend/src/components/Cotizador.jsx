@@ -53,13 +53,19 @@ export default function Cotizador({ productoPreseleccionado }) {
     setCalculando(true);
     const timeout = setTimeout(() => {
       api
-        .post("/api/cotizador/calcular", { material, ancho_m: anchoNum, alto_m: altoNum, con_acabado: conAcabado })
+        .post("/api/cotizador/calcular", {
+          material,
+          ancho_m: anchoNum,
+          alto_m: altoNum,
+          con_acabado: conAcabado,
+          producto_id: modo === "modelo" && productoId ? Number(productoId) : null,
+        })
         .then(setEstimado)
         .catch(() => setEstimado(null))
         .finally(() => setCalculando(false));
     }, 300);
     return () => clearTimeout(timeout);
-  }, [material, ancho, alto, conAcabado]);
+  }, [modo, productoId, material, ancho, alto, conAcabado]);
 
   const enviarSolicitud = async (e) => {
     e.preventDefault();

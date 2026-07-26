@@ -2,12 +2,6 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 
-const RUTA_PANEL = {
-  administrador: "/admin",
-  trabajador: "/trabajador",
-  cliente: "/cliente",
-};
-
 export default function Login() {
   const { login } = useAuth();
   const navegar = useNavigate();
@@ -21,8 +15,10 @@ export default function Login() {
     setEnviando(true);
     setError(null);
     try {
-      const usuario = await login(email, password);
-      navegar(RUTA_PANEL[usuario.rol] || "/");
+      await login(email, password);
+      // Tras iniciar sesión, siempre a la portada — cada rol accede a su
+      // panel desde el link "Mi panel" del header cuando lo necesite.
+      navegar("/");
     } catch (err) {
       setError(err.message);
     } finally {
