@@ -10,6 +10,7 @@ from routes.auth import auth_bp
 from routes.admin import admin_bp
 from routes.trabajador import trabajador_bp
 from routes.cliente import cliente_bp
+from routes.escalera import escalera_bp
 
 
 def create_app():
@@ -50,6 +51,7 @@ def create_app():
     app.register_blueprint(admin_bp, url_prefix="/api/admin")
     app.register_blueprint(trabajador_bp, url_prefix="/api/trabajador")
     app.register_blueprint(cliente_bp, url_prefix="/api/cliente")
+    app.register_blueprint(escalera_bp, url_prefix="/api/escalera")
 
     @app.get("/api/salud")
     def salud():
