@@ -76,6 +76,28 @@ uno su propia idea de qué es una pieza:
   cotizaciones creadas antes de que existiera esta columna. Seguro de correr
   más de una vez — solo toca las filas con `spec` nulo.
 
+## Ficha de escalera: dibujo + 3D en el PDF
+`POST /api/escalera/pdf` ya no entrega solo una tabla de números:
+- **Alzado 2D acotado, en vectores** (`backend/ficha_dibujo.py`, con
+  `reportlab.graphics.shapes`): la escalera a escala real, con las medidas
+  totales marcadas, más una **silueta humana de 1.70 m** a la misma escala.
+  No es decoración — es el detector de errores de captura más efectivo que
+  hay: si alguien escribió 320 en vez de 3.20, la pieza sale veinte veces
+  más alta que la persona y se nota antes de cortar el material.
+- **Vista 3D incrustada** (opcional): el frontend captura el canvas de
+  `Escalera3D.jsx` (`preserveDrawingBuffer: true` en el `WebGLRenderer` —
+  sin esa bandera `toDataURL()` sale en blanco) y la manda como base64 en el
+  mismo POST. Si la captura falla o llega corrupta, el PDF se genera igual,
+  sin la imagen — nunca por eso se deja de entregar la ficha.
+- Incluye el texto de qué NO cubre la ficha (obra civil, resane, pintura de
+  muro, instalaciones eléctricas) y la vigencia de 30 días.
+
+**Pendiente, no incluido en este alcance:** un solo endpoint de ficha para
+cualquier tipo de pieza (hoy solo existe para escalera — las cotizaciones
+del catálogo/personalizadas todavía no generan PDF, así que no había nada
+que unificar) y el QR a la vista 3D interactiva (depende del link público
+de aceptación de la Fase 7.1, que tampoco existe todavía).
+
 ## Estructura
 ```
 herreria-los-mejia/

@@ -1,12 +1,17 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useImperativeHandle, useRef } from "react";
 import * as THREE from "three";
 
 const COLOR_ESCALON = 0xd85a30;
 const COLOR_ZANCA = 0x2b2620;
 const COLOR_POSTE = 0x888780;
 
-export default function Escalera3D({ tipo, resultado, form }) {
+export default function Escalera3D({ tipo, resultado, form, capturaRef }) {
   const contenedorRef = useRef(null);
+  const rendererRef = useRef(null);
+
+  useImperativeHandle(capturaRef, () => ({
+    capturar: () => rendererRef.current?.domElement.toDataURL("image/png") ?? null,
+  }), []);
 
   useEffect(() => {
     const contenedor = contenedorRef.current;
@@ -17,10 +22,13 @@ export default function Escalera3D({ tipo, resultado, form }) {
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 100);
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    // preserveDrawingBuffer: sin esto, toDataURL() sale en blanco — el
+    // navegador descarta el buffer de dibujo después de presentar el frame.
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
     renderer.setSize(w, h);
     renderer.setPixelRatio(window.devicePixelRatio || 1);
     contenedor.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.7));
     const luzDireccional = new THREE.DirectionalLight(0xffffff, 0.6);
@@ -81,6 +89,7 @@ export default function Escalera3D({ tipo, resultado, form }) {
       });
       renderer.dispose();
       if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
+      if (rendererRef.current === renderer) rendererRef.current = null;
     };
   }, [tipo, resultado, form]);
 
