@@ -2,6 +2,9 @@
 Llena la base de datos con precios base, catálogo de ejemplo y usuarios de
 prueba (uno por cada rol). Ejecutar una sola vez: python seed.py
 
+Requiere que el esquema ya exista (corre `flask db upgrade` antes) — este
+script ya no crea tablas, solo datos.
+
 Las contraseñas de los usuarios de prueba se toman de variables de entorno
 (SEED_ADMIN_PASSWORD, SEED_TRABAJADOR_PASSWORD, SEED_CLIENTE_PASSWORD) — el
 script no corre si faltan, para que nunca queden contraseñas fijas en el
@@ -80,8 +83,6 @@ PRODUCTOS = [
 ]
 
 with app.app_context():
-    db.create_all()
-
     for p in PRECIOS:
         existente = PrecioMaterial.query.filter_by(material=p["material"]).first()
         if existente:

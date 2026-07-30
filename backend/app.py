@@ -2,7 +2,7 @@ import os
 from flask import Flask, send_from_directory
 from flask_cors import CORS
 
-from extensions import db, limiter
+from extensions import db, limiter, migrate
 from routes.catalogo import catalogo_bp
 from routes.cotizador import cotizador_bp
 from routes.chatbot import chatbot_bp
@@ -47,6 +47,7 @@ def create_app():
 
     db.init_app(app)
     limiter.init_app(app)
+    migrate.init_app(app, db)
 
     frontend_origin = os.environ.get("FRONTEND_ORIGIN", "*")
     CORS(app, resources={r"/api/*": {"origins": frontend_origin}}, supports_credentials=True)
@@ -67,9 +68,6 @@ def create_app():
     @app.get("/uploads/<path:nombre_archivo>")
     def servir_imagen(nombre_archivo):
         return send_from_directory(app.config["UPLOAD_FOLDER"], nombre_archivo)
-
-    with app.app_context():
-        db.create_all()
 
     return app
 

@@ -67,9 +67,20 @@ cp .env.example .env
 # cadena larga y aleatoria), y SEED_ADMIN_PASSWORD / SEED_TRABAJADOR_PASSWORD
 # / SEED_CLIENTE_PASSWORD (mínimo 12 caracteres) para los usuarios de prueba.
 
+flask --app app db upgrade    # crea/actualiza el esquema (Alembic)
 python seed.py                # carga catálogo, precios y usuarios de prueba
 python app.py                 # levanta en http://localhost:5000
 ```
+
+### Migraciones (Alembic)
+El esquema se maneja con Flask-Migrate, no con `db.create_all()`. Cada vez
+que cambien los modelos en `models.py`:
+```bash
+flask --app app db migrate -m "descripción del cambio"   # revisa el archivo generado en migrations/versions/ ANTES de aplicarlo
+flask --app app db upgrade
+```
+En Railway, el `Procfile` ya corre `flask --app app db upgrade` antes de
+levantar `gunicorn` en cada deploy.
 
 ### Frontend
 ```bash
@@ -117,6 +128,14 @@ subir las imágenes si el servicio se redespliega.
    Shell del servicio → `python seed.py` (una sola vez). Puedes borrar esas
    tres variables después de correrlo.
 6. (Opcional pero recomendado) configura el Volume de la sección 3.
+7. **Solo la primera vez que despliegas este `Procfile` con Alembic**, si el
+   servicio ya tenía tablas creadas por el antiguo `db.create_all()`: antes
+   de que corra el deploy nuevo, saca un respaldo (`pg_dump`) y marca la
+   base como si ya tuviera la migración inicial aplicada —
+   `flask --app app db stamp head` apuntando a la `DATABASE_URL` real —
+   o Alembic va a intentar crear tablas que ya existen y va a fallar.
+   Verifica con `flask --app app db current`. Después de este paso único,
+   los deploys siguientes solo corren `db upgrade` normal.
 
 ### Frontend
 1. Nuevo servicio con el mismo repo → **Root Directory** = `frontend`
