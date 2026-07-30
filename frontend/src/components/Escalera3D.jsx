@@ -1,12 +1,17 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useImperativeHandle, useRef } from "react";
 import * as THREE from "three";
 
 const COLOR_ESCALON = 0xd85a30;
 const COLOR_ZANCA = 0x2b2620;
 const COLOR_POSTE = 0x888780;
 
-export default function Escalera3D({ tipo, resultado, form }) {
+export default function Escalera3D({ tipo, resultado, form, capturaRef }) {
   const contenedorRef = useRef(null);
+  const rendererRef = useRef(null);
+
+  useImperativeHandle(capturaRef, () => ({
+    capturar: () => rendererRef.current?.domElement.toDataURL("image/png") ?? null,
+  }), []);
 
   useEffect(() => {
     const contenedor = contenedorRef.current;
@@ -17,10 +22,13 @@ export default function Escalera3D({ tipo, resultado, form }) {
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 100);
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    // preserveDrawingBuffer: sin esto, toDataURL() sale en blanco — el
+    // navegador descarta el buffer de dibujo después de presentar el frame.
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
     renderer.setSize(w, h);
     renderer.setPixelRatio(window.devicePixelRatio || 1);
     contenedor.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.7));
     const luzDireccional = new THREE.DirectionalLight(0xffffff, 0.6);
@@ -35,14 +43,13 @@ export default function Escalera3D({ tipo, resultado, form }) {
     envoltura.add(grupo);
     scene.add(envoltura);
 
-    const distancia = Math.max(tamano, 1.5) * 1.9 + 1;
-    camera.position.set(distancia * 0.75, distancia * 0.6, distancia * 0.85);
-    camera.lookAt(0, 0, 0);
+    const distanciaBase = Math.max(tamano, 1.5) * 1.9 + 1;
 
     let arrastrando = false;
     let anguloY = 0.6;
     let anguloX = -0.3;
     let ultimoX = 0, ultimoY = 0;
+    let zoom = 1;
 
     const onDown = (e) => { arrastrando = true; ultimoX = e.clientX; ultimoY = e.clientY; contenedor.style.cursor = "grabbing"; };
     const onUp = () => { arrastrando = false; contenedor.style.cursor = "grab"; };
@@ -54,9 +61,39 @@ export default function Escalera3D({ tipo, resultado, form }) {
       ultimoX = e.clientX;
       ultimoY = e.clientY;
     };
+    // Zoom con la rueda del ratón.
+    const onWheel = (e) => {
+      e.preventDefault();
+      zoom = Math.max(0.4, Math.min(2.5, zoom + e.deltaY * 0.0015));
+    };
+    // Gesto de pinza en móvil — en un teléfono la gente intenta hacer pinza
+    // por instinto, y antes solo se podía rotar.
+    let distanciaInicialPinza = null;
+    const distanciaEntreToques = (touches) => {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.hypot(dx, dy);
+    };
+    const onTouchStart = (e) => {
+      if (e.touches.length === 2) distanciaInicialPinza = distanciaEntreToques(e.touches);
+    };
+    const onTouchMove = (e) => {
+      if (e.touches.length === 2 && distanciaInicialPinza) {
+        e.preventDefault();
+        const actual = distanciaEntreToques(e.touches);
+        zoom = Math.max(0.4, Math.min(2.5, zoom * (distanciaInicialPinza / actual)));
+        distanciaInicialPinza = actual;
+      }
+    };
+    const onTouchEnd = () => { distanciaInicialPinza = null; };
+
     contenedor.addEventListener("pointerdown", onDown);
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointermove", onMove);
+    contenedor.addEventListener("wheel", onWheel, { passive: false });
+    contenedor.addEventListener("touchstart", onTouchStart, { passive: true });
+    contenedor.addEventListener("touchmove", onTouchMove, { passive: false });
+    contenedor.addEventListener("touchend", onTouchEnd);
 
     let auto = 0;
     let vivo = true;
@@ -66,6 +103,9 @@ export default function Escalera3D({ tipo, resultado, form }) {
       if (!arrastrando) auto += 0.004;
       envoltura.rotation.y = anguloY + auto;
       envoltura.rotation.x = anguloX;
+      const distancia = distanciaBase * zoom;
+      camera.position.set(distancia * 0.75, distancia * 0.6, distancia * 0.85);
+      camera.lookAt(0, 0, 0);
       renderer.render(scene, camera);
     }
     animar();
@@ -75,12 +115,17 @@ export default function Escalera3D({ tipo, resultado, form }) {
       contenedor.removeEventListener("pointerdown", onDown);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointermove", onMove);
+      contenedor.removeEventListener("wheel", onWheel);
+      contenedor.removeEventListener("touchstart", onTouchStart);
+      contenedor.removeEventListener("touchmove", onTouchMove);
+      contenedor.removeEventListener("touchend", onTouchEnd);
       scene.traverse((obj) => {
         if (obj.geometry) obj.geometry.dispose();
         if (obj.material) obj.material.dispose();
       });
       renderer.dispose();
       if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
+      if (rendererRef.current === renderer) rendererRef.current = null;
     };
   }, [tipo, resultado, form]);
 

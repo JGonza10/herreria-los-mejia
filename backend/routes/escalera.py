@@ -335,7 +335,8 @@ def pdf():
         return error
 
     from ficha_pdf import generar_ficha_pdf
-    buffer = generar_ficha_pdf(resultado, ETIQUETAS, NOMBRE_TIPO)
+    imagen_3d_base64 = data.get("imagen_3d_base64")
+    buffer = generar_ficha_pdf(resultado, ETIQUETAS, NOMBRE_TIPO, imagen_3d_base64=imagen_3d_base64)
 
     from flask import send_file
     nombre_archivo = f"escalera-{resultado['tipo']}.pdf"

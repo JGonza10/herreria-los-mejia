@@ -2,15 +2,34 @@
 Llena la base de datos con precios base, catálogo de ejemplo y usuarios de
 prueba (uno por cada rol). Ejecutar una sola vez: python seed.py
 
-IMPORTANTE: cambia las contraseñas de ejemplo antes de usar el sitio con
-clientes reales — puedes hacerlo desde el panel de administrador o
-directamente en la base de datos.
+Requiere que el esquema ya exista (corre `flask db upgrade` antes) — este
+script ya no crea tablas, solo datos.
+
+Las contraseñas de los usuarios de prueba se toman de variables de entorno
+(SEED_ADMIN_PASSWORD, SEED_TRABAJADOR_PASSWORD, SEED_CLIENTE_PASSWORD) — el
+script no corre si faltan, para que nunca queden contraseñas fijas en el
+código ni en el repositorio.
 """
+import os
+import sys
+
 from app import create_app
 from extensions import db
-from models import PrecioMaterial, Producto, Usuario
+from models import PrecioMaterial, Producto, TipoTrabajo, Usuario
 
 app = create_app()
+
+
+def password_requerido(nombre_var):
+    valor = os.environ.get(nombre_var)
+    if not valor or len(valor) < 12:
+        sys.exit(f"Falta {nombre_var} (mínimo 12 caracteres). El seed no corre sin ella.")
+    return valor
+
+
+PASSWORD_ADMIN = password_requerido("SEED_ADMIN_PASSWORD")
+PASSWORD_TRABAJADOR = password_requerido("SEED_TRABAJADOR_PASSWORD")
+PASSWORD_CLIENTE = password_requerido("SEED_CLIENTE_PASSWORD")
 
 PRECIOS = [
     {"material": "hierro", "precio_base_m2": 1200, "precio_acabado_extra_m2": 250},
@@ -63,8 +82,22 @@ PRODUCTOS = [
     },
 ]
 
+TIPOS_TRABAJO = [
+    {"clave": "porton_corredizo", "nombre": "Portón corredizo", "sistema": "herreria", "unidad": "m2", "modo_dibujo": "barrotes"},
+    {"clave": "porton_abatible", "nombre": "Portón abatible", "sistema": "herreria", "unidad": "m2", "modo_dibujo": "barrotes"},
+    {"clave": "reja_cerca", "nombre": "Reja o cerca", "sistema": "herreria", "unidad": "m2", "modo_dibujo": "barrotes"},
+    {"clave": "proteccion_ventana", "nombre": "Protección para ventana", "sistema": "herreria", "unidad": "m2", "modo_dibujo": "barrotes"},
+    {"clave": "barandal", "nombre": "Barandal", "sistema": "herreria", "unidad": "ml", "altura_referencia_m": 1.00, "modo_dibujo": "estructura"},
+    {"clave": "canceleria", "nombre": "Cancelería", "sistema": "aluminio", "unidad": "m2", "modo_dibujo": "cancel", "admite_barrotes": False},
+    {"clave": "ventana_aluminio", "nombre": "Ventana de aluminio", "sistema": "aluminio", "unidad": "m2", "modo_dibujo": "cancel", "admite_barrotes": False},
+    {"clave": "puerta_cristal_templado", "nombre": "Puerta de cristal templado", "sistema": "cristal_templado", "unidad": "m2", "modo_dibujo": "vidrio", "admite_barrotes": False},
+    {"clave": "escalera", "nombre": "Escalera", "sistema": "herreria", "unidad": "ml", "modo_dibujo": "estructura", "admite_barrotes": False},
+]
+
 with app.app_context():
-    db.create_all()
+    for t in TIPOS_TRABAJO:
+        if not TipoTrabajo.query.filter_by(clave=t["clave"]).first():
+            db.session.add(TipoTrabajo(**t))
 
     for p in PRECIOS:
         existente = PrecioMaterial.query.filter_by(material=p["material"]).first()
@@ -79,9 +112,9 @@ with app.app_context():
             db.session.add(Producto(**prod))
 
     USUARIOS_EJEMPLO = [
-        {"nombre": "Admin Los Mejía", "email": "admin@losmejia.com", "password": "cambiar123", "rol": "administrador"},
-        {"nombre": "Trabajador Ejemplo", "email": "trabajador@losmejia.com", "password": "cambiar123", "rol": "trabajador"},
-        {"nombre": "Cliente Ejemplo", "email": "cliente@losmejia.com", "password": "cambiar123", "rol": "cliente"},
+        {"nombre": "Admin Los Mejía", "email": "admin@losmejia.com", "password": PASSWORD_ADMIN, "rol": "administrador"},
+        {"nombre": "Trabajador Ejemplo", "email": "trabajador@losmejia.com", "password": PASSWORD_TRABAJADOR, "rol": "trabajador"},
+        {"nombre": "Cliente Ejemplo", "email": "cliente@losmejia.com", "password": PASSWORD_CLIENTE, "rol": "cliente"},
     ]
     for datos in USUARIOS_EJEMPLO:
         if not Usuario.query.filter_by(email=datos["email"]).first():
@@ -91,6 +124,6 @@ with app.app_context():
 
     db.session.commit()
     print("Datos de ejemplo cargados correctamente.")
-    print("Usuarios de prueba (cambia las contraseñas antes de producción):")
+    print("Usuarios de prueba (contraseñas tomadas de las variables de entorno, no se imprimen):")
     for datos in USUARIOS_EJEMPLO:
-        print(f"  {datos['rol']}: {datos['email']} / {datos['password']}")
+        print(f"  {datos['rol']}: {datos['email']}")

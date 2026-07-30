@@ -1,8 +1,11 @@
+import logging
 import os
-from flask import Flask, send_from_directory
+import sys
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
+from werkzeug.exceptions import HTTPException
 
-from extensions import db
+from extensions import db, limiter, migrate
 from routes.catalogo import catalogo_bp
 from routes.cotizador import cotizador_bp
 from routes.chatbot import chatbot_bp
@@ -11,9 +14,21 @@ from routes.admin import admin_bp
 from routes.trabajador import trabajador_bp
 from routes.cliente import cliente_bp
 from routes.escalera import escalera_bp
+from routes.tarifas import tarifas_bp
+
+
+def _configurar_logging():
+    # Logging estructurado a stdout: Railway captura stdout y lo indexa solo.
+    # Sin esto, "me marcó error" no tiene forma de investigarse después.
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    root = logging.getLogger()
+    root.handlers = [handler]
+    root.setLevel(logging.INFO)
 
 
 def create_app():
+    _configurar_logging()
     app = Flask(__name__)
 
     db_url = os.environ.get("DATABASE_URL", "sqlite:///local.db")
@@ -30,8 +45,14 @@ def create_app():
 
     # SECRET_KEY firma los tokens de autenticación (ver auth.py). Debe
     # fijarse en producción vía variable de entorno para que los tokens no
-    # se invaliden en cada deploy.
-    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "clave-de-desarrollo-cambiar-en-produccion")
+    # se invaliden en cada deploy. Si falta en Railway, la app no arranca:
+    # una firma débil no se nota nunca, un servicio caído se nota en minutos.
+    secret_key = os.environ.get("SECRET_KEY")
+    if not secret_key:
+        if os.environ.get("RAILWAY_ENVIRONMENT"):
+            raise RuntimeError("SECRET_KEY no está definida. La app no arranca sin ella.")
+        secret_key = "solo-desarrollo-local"
+    app.config["SECRET_KEY"] = secret_key
 
     # Carpeta donde se guardan las imágenes del catálogo.
     # NOTA: el disco de Railway es efímero salvo que agregues un Volume
@@ -39,7 +60,14 @@ def create_app():
     app.config["UPLOAD_FOLDER"] = os.environ.get("UPLOAD_FOLDER", os.path.join(app.root_path, "uploads"))
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
+    # Límite duro al tamaño de cualquier petición (principalmente las subidas
+    # de imágenes del catálogo) — sin esto, un archivo enorme se procesa
+    # entero antes de que algo lo rechace.
+    app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
+
     db.init_app(app)
+    limiter.init_app(app)
+    migrate.init_app(app, db)
 
     frontend_origin = os.environ.get("FRONTEND_ORIGIN", "*")
     CORS(app, resources={r"/api/*": {"origins": frontend_origin}}, supports_credentials=True)
@@ -52,6 +80,12 @@ def create_app():
     app.register_blueprint(trabajador_bp, url_prefix="/api/trabajador")
     app.register_blueprint(cliente_bp, url_prefix="/api/cliente")
     app.register_blueprint(escalera_bp, url_prefix="/api/escalera")
+    app.register_blueprint(tarifas_bp, url_prefix="/api/admin/tarifas")
+
+    @app.after_request
+    def log_peticion(response):
+        app.logger.info(f"{request.method} {request.path} -> {response.status_code}")
+        return response
 
     @app.get("/api/salud")
     def salud():
@@ -61,8 +95,16 @@ def create_app():
     def servir_imagen(nombre_archivo):
         return send_from_directory(app.config["UPLOAD_FOLDER"], nombre_archivo)
 
-    with app.app_context():
-        db.create_all()
+    @app.errorhandler(ValueError)
+    def manejar_valor_invalido(error):
+        return jsonify({"error": str(error)}), 400
+
+    @app.errorhandler(Exception)
+    def manejar_error_generico(error):
+        if isinstance(error, HTTPException):
+            return error
+        app.logger.exception("Error no manejado")
+        return jsonify({"error": "Ocurrió un error interno. Intenta de nuevo más tarde."}), 500
 
     return app
 

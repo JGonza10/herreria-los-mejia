@@ -1,11 +1,14 @@
 """Genera la ficha técnica en PDF de una escalera ya calculada."""
+import base64
 import io
 from datetime import datetime
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+from ficha_dibujo import dibujar_perfil_escalera
 
 COLOR_ASCUA = colors.HexColor("#c2532a")
 COLOR_TEXTO = colors.HexColor("#2b2620")
@@ -17,7 +20,7 @@ COLOR_AVISO_TEXTO = colors.HexColor("#712b13")
 CAMPOS_OCULTOS = {"tipo", "avisos"}
 
 
-def generar_ficha_pdf(resultado, etiquetas, nombre_tipo):
+def generar_ficha_pdf(resultado, etiquetas, nombre_tipo, imagen_3d_base64=None):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=letter,
@@ -37,6 +40,25 @@ def generar_ficha_pdf(resultado, etiquetas, nombre_tipo):
         f"{datetime.now().strftime('%d/%m/%Y')}",
         estilo_sub,
     ))
+
+    # Alzado 2D acotado, a escala real, con la silueta de 1.70 m de
+    # referencia — se recalcula en el servidor, nunca se confía en un
+    # dibujo hecho en el cliente.
+    elementos.append(Paragraph("Alzado", estilo_seccion))
+    elementos.append(dibujar_perfil_escalera(resultado))
+
+    if imagen_3d_base64:
+        try:
+            datos_imagen = base64.b64decode(imagen_3d_base64.split(",")[-1])
+            imagen = Image(io.BytesIO(datos_imagen), width=9 * cm, height=9 * 380 / 700 * cm)
+            imagen.hAlign = "LEFT"
+            elementos.append(Spacer(1, 6))
+            elementos.append(Paragraph("Vista 3D", estilo_seccion))
+            elementos.append(imagen)
+        except Exception:
+            pass  # una captura corrupta no debe tumbar la generación del PDF
+
+    elementos.append(Spacer(1, 10))
 
     # Avisos normativos, si los hay
     avisos = resultado.get("avisos") or []
@@ -67,6 +89,13 @@ def generar_ficha_pdf(resultado, etiquetas, nombre_tipo):
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#fdfcf9")]),
     ]))
     elementos.append(tabla)
+
+    elementos.append(Paragraph(
+        "<b>Esta ficha no incluye:</b> obra civil, resane, pintura de muro, "
+        "ni instalaciones eléctricas — salvo que se indique explícitamente. "
+        "Vigente 30 días a partir de la fecha de emisión.",
+        ParagraphStyle("no_incluye", parent=estilos["Normal"], textColor=COLOR_TEXTO, fontSize=9, spaceBefore=14, spaceAfter=6),
+    ))
 
     elementos.append(Paragraph(
         "Calculadora de apoyo para taller — no sustituye una revisión estructural "

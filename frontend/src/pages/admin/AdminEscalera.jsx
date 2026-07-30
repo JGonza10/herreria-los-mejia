@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../../api.js";
 import { API_BASE } from "../../config.js";
 import Escalera3D from "../../components/Escalera3D.jsx";
@@ -28,6 +28,7 @@ export default function AdminEscalera() {
   const [avisos, setAvisos] = useState([]);
   const [calculando, setCalculando] = useState(false);
   const [error, setError] = useState(null);
+  const capturaRef = useRef(null);
 
   const cambiar = (campo) => (e) => setForm((f) => ({ ...f, [campo]: e.target.value }));
 
@@ -103,13 +104,13 @@ export default function AdminEscalera() {
           {resultado && resultado.tipo === tipo && <TarjetasResultado tipo={tipo} resultado={resultado} />}
           {resultado && resultado.tipo === tipo && (
             <div style={{ border: "1px solid var(--borde)", borderRadius: "var(--radius-md)", padding: 16, background: "var(--fondo-elevado)" }}>
-              <Escalera3D tipo={tipo} resultado={resultado} form={form} />
+              <Escalera3D tipo={tipo} resultado={resultado} form={form} capturaRef={capturaRef} />
             </div>
           )}
 
           {resultado && resultado.tipo === tipo && (
             <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-              <BotonDescarga tipo={tipo} form={form} ruta="/api/escalera/pdf" nombreArchivo={`escalera-${tipo}.pdf`} etiqueta="Descargar ficha en PDF" />
+              <BotonDescarga tipo={tipo} form={form} ruta="/api/escalera/pdf" nombreArchivo={`escalera-${tipo}.pdf`} etiqueta="Descargar ficha en PDF" capturaRef={capturaRef} />
               <BotonDescarga tipo={tipo} form={form} ruta="/api/escalera/excel" nombreArchivo={`escalera-${tipo}.xlsx`} etiqueta="Descargar registro en Excel" />
             </div>
           )}
@@ -251,13 +252,15 @@ const avisoEstilo = {
   marginBottom: 10,
 };
 
-function BotonDescarga({ tipo, form, ruta, nombreArchivo, etiqueta }) {
+function BotonDescarga({ tipo, form, ruta, nombreArchivo, etiqueta, capturaRef }) {
   const [descargando, setDescargando] = useState(false);
   const [error, setError] = useState(null);
 
   const descargar = async () => {
     const body = construirCuerpo(tipo, form);
     if (!body) return;
+    const imagen3d = capturaRef?.current?.capturar();
+    if (imagen3d) body.imagen_3d_base64 = imagen3d;
     setDescargando(true);
     setError(null);
     try {

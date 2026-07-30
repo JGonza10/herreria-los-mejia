@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from extensions import db
 from models import Usuario
-from auth import usuario_actual, generar_token
+from auth import usuario_actual, generar_token, requiere_login
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -29,7 +29,7 @@ def registro():
     db.session.add(usuario)
     db.session.commit()
 
-    token = generar_token(usuario.id)
+    token = generar_token(usuario)
     return jsonify({**usuario.to_dict(), "token": token}), 201
 
 
@@ -43,7 +43,7 @@ def login():
     if not usuario or not usuario.check_password(password) or not usuario.activo:
         return jsonify({"error": "Email o contraseña incorrectos."}), 401
 
-    token = generar_token(usuario.id)
+    token = generar_token(usuario)
     return jsonify({**usuario.to_dict(), "token": token})
 
 
@@ -60,3 +60,27 @@ def yo():
     if not usuario:
         return jsonify({"usuario": None})
     return jsonify({"usuario": usuario.to_dict()})
+
+
+@auth_bp.post("/password")
+@requiere_login
+def cambiar_password():
+    """Cambia la contraseña del usuario logueado. Sube su token_version, así
+    que cualquier otra sesión abierta (otro navegador, un token robado)
+    queda invalidada de inmediato."""
+    usuario = usuario_actual()
+    data = request.get_json(force=True)
+    password_actual = data.get("password_actual", "")
+    password_nueva = data.get("password_nueva", "")
+
+    if not usuario.check_password(password_actual):
+        return jsonify({"error": "La contraseña actual no es correcta."}), 401
+    if len(password_nueva) < 6:
+        return jsonify({"error": "La contraseña nueva debe tener al menos 6 caracteres."}), 400
+
+    usuario.set_password(password_nueva)
+    usuario.token_version += 1
+    db.session.commit()
+
+    token = generar_token(usuario)
+    return jsonify({"ok": True, "token": token})
