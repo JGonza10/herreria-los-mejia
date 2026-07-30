@@ -113,18 +113,48 @@ abandona a los tres meses (actualizar.md, Fase 4.2).
   todo de un jalón ("copiar Julio 2026 a Agosto 2026 y subir todo 4 %").
 - Todas las tablas son nuevas (`tarifas`, `precios_tarifa`); nada se borró.
 
-**Pendiente, no incluido en este alcance:** el cotizador (`routes/cotizador.py`)
-todavía lee `PrecioMaterial`, no la tarifa activa — conectarlo depende de
-resolver primero cómo se cobra cada sistema (Fase 4.3: aluminio por perfil +
-cristal, cristal templado con mínimo de fabricación y canteado por
-perímetro), que es un cambio de lógica de negocio real, no solo de dónde
-vive el número. Tampoco se restructuró `Cotizacion` en `Cotizacion` +
-`Partida` (Fase 4.1) — ese cambio toca 3 rutas del backend y 4 páginas del
-frontend (`Cotizador.jsx`, `AdminCotizaciones.jsx`, `AdminPedidos.jsx`,
-`ClientePanel.jsx`) más una migración de datos reales, y el propio plan
-pide confirmar antes con el dueño del taller si el cliente ve un precio
-exacto o un rango (recomendado: rango). Se dejó fuera para no reescribir
-media aplicación sin poder probarla en un navegador real.
+## Partidas múltiples y cobro por sistema (Fase 4.1/4.3/4.4)
+`POST /api/cotizador/solicitar` acepta ahora un cuerpo con `piezas` (lista) en
+vez de una sola pieza — cada elemento es `{tipo, material, ancho_m, alto_m,
+con_acabado, piezas, descripcion}`. Con eso:
+- Cada pieza se cotiza con **la tarifa activa** (no `PrecioMaterial`) y con
+  la estrategia de cobro de su sistema:
+  - **Herrería**: m² × (precio base + acabado si aplica).
+  - **Aluminio**: metros lineales de perfil (perímetro) + m² de cristal —
+    dos precios que se mueven por separado.
+  - **Cristal templado**: m² con **mínimo de fabricación** (`minimo_facturable`
+    de `TipoTrabajo`) + canteado cobrado por perímetro, no por área. Una
+    puerta de 40×40 cm ya no cuesta la sexta parte de una de 1×1 m.
+  - **Cualquier tipo en `ml`** (barandal): por metro lineal, no por m² — la
+    corrección de modelado que el plan marca como la más importante de esta
+    fase. Por convención, `ancho_m` guarda la longitud para estos tipos.
+- Se crea una `Partida` por pieza (con su propio `spec` y `desglose`), y la
+  `Cotizacion` guarda `folio` (`LM-AAAA-NNNN`), `vigencia_hasta` (+30 días),
+  `subtotal`, `descuento` e `iva` (16 % opcional) y `total`.
+- Si no hay ninguna tarifa activa, responde 400 con un mensaje claro en vez
+  de inventar un precio.
+- **El flujo de una sola pieza sigue exactamente igual** (`Cotizador.jsx` no
+  cambió): sin `piezas` en el cuerpo, usa `PrecioMaterial` como siempre, sin
+  folio ni tarifa. Los dos caminos conviven en el mismo endpoint.
+- `backend/migrar_partidas.py`: backfill de una sola pasada — convierte cada
+  cotización vieja (sin partidas) en una cotización con una sola partida,
+  usando el precio que ya tenía guardado (no recalcula nada).
+- `POST /api/admin/cotizaciones/<id>/simular` (solo administrador): recalcula
+  el precio con parámetros ajustables en vivo (mano de obra, flete, % de
+  merma, % de utilidad, descuento, IVA) **sin guardar nada** hasta que el
+  administrador confirme desde otra pantalla. Devuelve el **margen sobre
+  venta** (no el % de utilidad sobre costo — son números distintos: 25%
+  sobre costo es 20% sobre venta) y el estimado del cliente como **rango**
+  (±10%), nunca como número exacto.
+
+**Pendiente, no incluido en este alcance:** no hay pantalla de frontend para
+capturar varias piezas en una sola solicitud, ni para correr la simulación
+— ambos endpoints existen y están probados, pero se consumen hoy solo por
+API. Construir esas pantallas (`Cotizador.jsx` con varias piezas,
+`AdminCotizaciones.jsx` con el panel de simulación) requiere probarlas en un
+navegador real, que no está disponible en este entorno, y el plan pide
+confirmar antes con el dueño del taller si el cliente ve un precio exacto o
+un rango (recomendado: rango) antes de exponerlo en una pantalla pública.
 
 ## Estructura
 ```

@@ -147,8 +147,23 @@ class Cotizacion(db.Model):
     # tienen — ver backend/migrar_specs.py para el backfill.
     spec = db.Column(db.JSON, nullable=True)
 
+    # Fase 4.1: una cotización puede tener varias partidas (piezas). Los
+    # campos de arriba (material/ancho_m/alto_m/precio_estimado) se
+    # conservan para no romper al frontend actual, que todavía muestra una
+    # cotización como una sola pieza — reflejan siempre la primera partida.
+    # folio/vigencia/subtotal/descuento/iva/total y tarifa_id son nullable
+    # porque las cotizaciones viejas no los tienen — ver migrar_partidas.py.
+    folio = db.Column(db.String(20), unique=True, nullable=True)
+    vigencia_hasta = db.Column(db.Date, nullable=True)
+    subtotal = db.Column(db.Numeric(12, 2), nullable=True)
+    descuento = db.Column(db.Numeric(12, 2), default=0)
+    iva = db.Column(db.Numeric(12, 2), default=0)
+    total = db.Column(db.Numeric(12, 2), nullable=True)
+    tarifa_id = db.Column(db.Integer, db.ForeignKey("tarifas.id"), nullable=True)
+
     producto = db.relationship("Producto")
     proyecto = db.relationship("Proyecto", back_populates="cotizacion", uselist=False)
+    partidas = db.relationship("Partida", back_populates="cotizacion", cascade="all, delete-orphan", order_by="Partida.orden")
 
     def to_dict(self):
         return {
@@ -168,8 +183,53 @@ class Cotizacion(db.Model):
             "notas": self.notas,
             "estado": self.estado,
             "spec": self.spec,
+            "folio": self.folio,
+            "vigencia_hasta": self.vigencia_hasta.isoformat() if self.vigencia_hasta else None,
+            "subtotal": float(self.subtotal) if self.subtotal is not None else None,
+            "descuento": float(self.descuento) if self.descuento is not None else 0.0,
+            "iva": float(self.iva) if self.iva is not None else 0.0,
+            "total": float(self.total) if self.total is not None else None,
+            "tarifa_id": self.tarifa_id,
+            "partidas": [p.to_dict() for p in self.partidas],
             "tiene_proyecto": self.proyecto is not None,
             "creado_en": self.creado_en.isoformat(),
+        }
+
+
+class Partida(db.Model):
+    """Una pieza dentro de una cotización. Hoy el cotizador solo crea una
+    partida por cotización (ver routes/cotizador.py); el modelo ya admite
+    varias para cuando el formulario deje capturar más de una pieza en la
+    misma solicitud, sin volver a tocar el esquema."""
+    __tablename__ = "partidas"
+
+    id = db.Column(db.Integer, primary_key=True)
+    cotizacion_id = db.Column(db.Integer, db.ForeignKey("cotizaciones.id"), nullable=False, index=True)
+    tipo_trabajo_id = db.Column(db.Integer, db.ForeignKey("tipos_trabajo.id"), nullable=True)
+    spec = db.Column(db.JSON, nullable=False)
+    descripcion = db.Column(db.String(200), nullable=True)
+    cantidad = db.Column(db.Numeric(8, 2), nullable=False)       # m² o ml, según el tipo
+    precio_unitario = db.Column(db.Numeric(10, 2), nullable=False)
+    importe = db.Column(db.Numeric(12, 2), nullable=False)
+    desglose = db.Column(db.JSON, nullable=True)
+    orden = db.Column(db.Integer, default=0)
+
+    cotizacion = db.relationship("Cotizacion", back_populates="partidas")
+    tipo_trabajo = db.relationship("TipoTrabajo")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "cotizacion_id": self.cotizacion_id,
+            "tipo_trabajo_id": self.tipo_trabajo_id,
+            "tipo_trabajo_nombre": self.tipo_trabajo.nombre if self.tipo_trabajo else None,
+            "spec": self.spec,
+            "descripcion": self.descripcion,
+            "cantidad": float(self.cantidad),
+            "precio_unitario": float(self.precio_unitario),
+            "importe": float(self.importe),
+            "desglose": self.desglose,
+            "orden": self.orden,
         }
 
 

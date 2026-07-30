@@ -1,15 +1,18 @@
+from datetime import date, timedelta
 from flask import Blueprint, jsonify, request
 from extensions import db
-from models import PrecioMaterial, Cotizacion, Producto, TipoTrabajo
+from models import PrecioMaterial, Cotizacion, Partida, Producto, Tarifa, TipoTrabajo
 from auth import usuario_actual
 from validacion import numero
-from dominio.precios import calcular_precio
+from dominio.precios import calcular_precio, cotizar_partida
 from dominio.spec import construir_basico
 
 cotizador_bp = Blueprint("cotizador", __name__)
 
 ANCHO_MAXIMO_M = 15
 ALTO_MAXIMO_M = 6
+VIGENCIA_DIAS = 30
+TASA_IVA = 0.16
 
 
 @cotizador_bp.get("/precios")
@@ -53,8 +56,17 @@ def solicitar_cotizacion():
     """Crea una cotización. Puede venir de un visitante (sin sesión) o de un
     cliente logueado — en ese caso se liga a su cuenta automáticamente.
     Si trae producto_id, es una cotización basada en un modelo del catálogo;
-    si no, es una propuesta personalizada (material + medidas libres)."""
+    si no, es una propuesta personalizada (material + medidas libres).
+
+    Si el cuerpo trae 'piezas' (lista), es una cotización con varias
+    partidas (Fase 4.1/4.3): cada pieza se cotiza con la tarifa activa y su
+    propia estrategia de cobro por sistema. Sin 'piezas', se comporta
+    exactamente igual que siempre — el frontend actual (Cotizador.jsx)
+    manda una sola pieza y sigue funcionando sin cambios."""
     data = request.get_json(force=True)
+    if data.get("piezas"):
+        return _solicitar_multiple(data)
+
     required = ["nombre_cliente", "telefono", "material", "ancho_m", "alto_m"]
     faltantes = [campo for campo in required if campo not in data]
     if faltantes:
@@ -93,6 +105,101 @@ def solicitar_cotizacion():
         spec=spec,
     )
     db.session.add(cotizacion)
+    db.session.commit()
+
+    return jsonify(cotizacion.to_dict()), 201
+
+
+def _solicitar_multiple(data):
+    required = ["nombre_cliente", "telefono"]
+    faltantes = [campo for campo in required if campo not in data]
+    if faltantes:
+        return jsonify({"error": f"Faltan campos: {', '.join(faltantes)}"}), 400
+
+    piezas_data = data["piezas"]
+    if not isinstance(piezas_data, list) or not piezas_data:
+        return jsonify({"error": "'piezas' debe ser una lista con al menos un elemento."}), 400
+
+    tarifa = Tarifa.query.filter_by(activa=True).first()
+    if not tarifa:
+        return jsonify({"error": "No hay una tarifa activa. Actívala en Admin → Tarifas antes de cotizar."}), 400
+
+    usuario = usuario_actual()
+    cotizacion = Cotizacion(
+        cliente_id=usuario.id if usuario else None,
+        nombre_cliente=data["nombre_cliente"],
+        telefono=data["telefono"],
+        email=data.get("email"),
+        notas=data.get("notas"),
+        tarifa_id=tarifa.id,
+        vigencia_hasta=date.today() + timedelta(days=VIGENCIA_DIAS),
+        # Los campos heredados (material/ancho_m/...) reflejan la primera
+        # partida, para que un consumidor que todavía espera una sola pieza
+        # (el frontend actual no llama esta ruta, pero el modelo lo permite)
+        # no se rompa con nulos.
+        material="", ancho_m=0, alto_m=0, metros_cuadrados=0, precio_estimado=0,
+    )
+
+    subtotal = 0
+    for i, pieza in enumerate(piezas_data):
+        prefijo = f"piezas[{i}]"
+        material = (pieza.get("material") or "").strip()
+        if not material:
+            return jsonify({"error": f"{prefijo}.material es obligatorio."}), 400
+
+        tipo_clave = pieza.get("tipo") or "indefinido"
+        tipo_trabajo = TipoTrabajo.query.filter_by(clave=tipo_clave, activo=True).first()
+
+        ancho_m = numero(pieza.get("ancho_m"), f"{prefijo}.ancho_m", minimo=0.1, maximo=ANCHO_MAXIMO_M)
+        alto_m = numero(pieza.get("alto_m"), f"{prefijo}.alto_m", minimo=0.1, maximo=ALTO_MAXIMO_M)
+        con_acabado = bool(pieza.get("con_acabado", False))
+        n_piezas = int(numero(pieza.get("piezas", 1), f"{prefijo}.piezas", minimo=1, maximo=200))
+
+        spec = construir_basico(material, ancho_m, alto_m, con_acabado, tipo=tipo_clave,
+                                 sistema=tipo_trabajo.sistema if tipo_trabajo else None)
+        spec["material"] = material
+        spec["piezas"] = n_piezas
+
+        importe, desglose = cotizar_partida(spec, tipo_trabajo, tarifa)
+        cantidad = desglose.get("longitud_ml", desglose.get("area_m2", 0))
+        precio_unitario = desglose["importe_unitario"]
+
+        partida = Partida(
+            tipo_trabajo_id=tipo_trabajo.id if tipo_trabajo else None,
+            spec=spec,
+            descripcion=pieza.get("descripcion") or (tipo_trabajo.nombre if tipo_trabajo else tipo_clave),
+            cantidad=cantidad,
+            precio_unitario=precio_unitario,
+            importe=importe,
+            desglose=desglose,
+            orden=i,
+        )
+        cotizacion.partidas.append(partida)
+        subtotal += importe
+
+        if i == 0:
+            cotizacion.material = material
+            cotizacion.ancho_m = ancho_m
+            cotizacion.alto_m = alto_m
+            cotizacion.con_acabado = con_acabado
+            cotizacion.metros_cuadrados = cantidad
+            cotizacion.precio_estimado = importe
+            cotizacion.spec = spec
+
+    descuento = numero(data.get("descuento", 0), "descuento", minimo=0, maximo=subtotal)
+    aplica_iva = bool(data.get("aplica_iva", False))
+    base = round(subtotal - descuento, 2)
+    iva = round(base * TASA_IVA, 2) if aplica_iva else 0
+    total = round(base + iva, 2)
+
+    cotizacion.subtotal = round(subtotal, 2)
+    cotizacion.descuento = descuento
+    cotizacion.iva = iva
+    cotizacion.total = total
+
+    db.session.add(cotizacion)
+    db.session.flush()  # asigna cotizacion.id, usado en el folio
+    cotizacion.folio = f"LM-{date.today().year}-{cotizacion.id:04d}"
     db.session.commit()
 
     return jsonify(cotizacion.to_dict()), 201

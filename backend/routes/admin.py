@@ -137,6 +137,52 @@ def rechazar_cotizacion(cotizacion_id):
     return jsonify(cotizacion.to_dict())
 
 
+@admin_bp.post("/cotizaciones/<int:cotizacion_id>/simular")
+@requiere_rol("administrador")
+def simular_cotizacion(cotizacion_id):
+    """Recalcula el precio con parámetros que el dueño ajusta en vivo — NO
+    se guarda nada aquí, hasta que confirme desde otra pantalla (Fase 4.4).
+    El material_base sale de las partidas ya cotizadas con la tarifa
+    activa; mano de obra, flete, merma y utilidad son ajustables porque
+    varían por trabajo y hoy no viven en ninguna tabla.
+
+    Muestra el margen sobre venta, no el porcentaje de utilidad sobre
+    costo — son números distintos: 25% sobre costo es ~20% sobre venta, y
+    confundirlos hace creer que se gana más de lo que realmente se gana."""
+    cotizacion = Cotizacion.query.get_or_404(cotizacion_id)
+    data = request.get_json(force=True)
+
+    material_base = sum(float(p.importe) for p in cotizacion.partidas) or float(cotizacion.precio_estimado or 0)
+    mano_obra = numero(data.get("mano_obra", 0), "mano_obra", minimo=0)
+    flete_km = numero(data.get("flete_km", 0), "flete_km", minimo=0)
+    flete_precio_km = numero(data.get("flete_precio_km", 0), "flete_precio_km", minimo=0)
+    merma_pct = numero(data.get("merma_pct", 0), "merma_pct", minimo=0, maximo=100)
+    utilidad_pct = numero(data.get("utilidad_pct", 25), "utilidad_pct", minimo=0, maximo=500)
+    descuento = numero(data.get("descuento", 0), "descuento", minimo=0)
+    aplica_iva = bool(data.get("aplica_iva", False))
+
+    merma = round(material_base * merma_pct / 100, 2)
+    flete = round(flete_km * flete_precio_km, 2)
+    costo_directo = round(material_base + merma + mano_obra + flete, 2)
+    utilidad = round(costo_directo * utilidad_pct / 100, 2)
+    subtotal = round(max(costo_directo + utilidad - descuento, 0), 2)
+    iva = round(subtotal * 0.16, 2) if aplica_iva else 0.0
+    total = round(subtotal + iva, 2)
+    margen_sobre_venta_pct = round(utilidad / subtotal * 100, 2) if subtotal else 0.0
+
+    return jsonify({
+        "material_base": round(material_base, 2),
+        "merma_pct": merma_pct, "merma": merma,
+        "mano_obra": mano_obra, "flete": flete,
+        "costo_directo": costo_directo,
+        "utilidad_pct": utilidad_pct, "utilidad": utilidad,
+        "margen_sobre_venta_pct": margen_sobre_venta_pct,
+        "descuento": descuento, "subtotal": subtotal, "iva": iva, "total": total,
+        "estimado_cliente_min": round(total * 0.9, 2),
+        "estimado_cliente_max": round(total * 1.1, 2),
+    })
+
+
 # ---------- Proyectos (dashboard de pedidos) ----------
 
 @admin_bp.get("/proyectos")
