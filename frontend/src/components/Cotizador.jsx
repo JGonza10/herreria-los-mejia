@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import Pieza3D from "./Pieza3D.jsx";
+import Pieza2D from "./Pieza2D.jsx";
 
 const MATERIALES = ["hierro", "aluminio", "vidrio"];
+
+// El cotizador todavía no pregunta el tipo de trabajo (eso es Fase 4.1 de
+// frontend, fuera de este alcance) — mientras tanto, el material ya alcanza
+// para elegir una representación razonable en la vista previa.
+const MODO_DIBUJO_POR_MATERIAL = { hierro: "barrotes", aluminio: "cancel", vidrio: "vidrio" };
 
 export default function Cotizador({ productoPreseleccionado }) {
   const { usuario } = useAuth();
@@ -216,6 +223,8 @@ export default function Cotizador({ productoPreseleccionado }) {
           </div>
         </div>
 
+        <VistaPrevia material={material} ancho={ancho} alto={alto} />
+
         {mostrarFormulario && !enviado && (
           <form
             onSubmit={enviarSolicitud}
@@ -251,6 +260,43 @@ export default function Cotizador({ productoPreseleccionado }) {
         )}
       </div>
     </section>
+  );
+}
+
+function VistaPrevia({ material, ancho, alto }) {
+  const anchoNum = Number(ancho);
+  const altoNum = Number(alto);
+  if (!anchoNum || !altoNum || anchoNum <= 0 || altoNum <= 0) return null;
+
+  const modoDibujo = MODO_DIBUJO_POR_MATERIAL[material] || "barrotes";
+  const spec = { medidas: { ancho_m: anchoNum, alto_m: altoNum }, estructura: {} };
+
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 24,
+        background: "var(--fondo-elevado)",
+        border: "1px solid var(--borde)",
+        borderRadius: "var(--radius-md)",
+        padding: 24,
+        marginTop: 20,
+      }}
+    >
+      <div>
+        <span style={etiquetaEstilo}>Vista 3D</span>
+        <div style={{ marginTop: 10 }}>
+          <Pieza3D spec={spec} modoDibujo={modoDibujo} />
+        </div>
+      </div>
+      <div>
+        <span style={etiquetaEstilo}>Alzado</span>
+        <div style={{ marginTop: 10 }}>
+          <Pieza2D spec={spec} modoDibujo={modoDibujo} />
+        </div>
+      </div>
+    </div>
   );
 }
 

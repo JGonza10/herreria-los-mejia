@@ -185,6 +185,39 @@ hace falta un solver.
   mismo valor del ejemplo de la Fase 2) — es un despiece de referencia, no
   el definitivo del taller, hasta que el formulario capture esos datos.
 
+## 3D paramétrico para el resto del catálogo (Fase 6)
+`Escalera3D.jsx` (three.js puro) demostró que la capacidad ya estaba en el
+proyecto — el problema era que solo existía para escaleras. Ahora:
+
+- **`frontend/src/components/Pieza3D.jsx`**: componente genérico que recibe
+  la especificación unificada de pieza y arma la escena — un constructor
+  por `modo_dibujo` (`barrotes`, `cancel`, `vidrio`, `estructura`), mismo
+  patrón `CONSTRUCTORES[tipo]` que ya usaba `Escalera3D.jsx`. Cristal con
+  transparencia real (`MeshPhysicalMaterial` + `transmission`, no un color
+  plano). Zoom con la rueda del ratón y gesto de pinza en móvil — y se lo
+  agregué también a `Escalera3D.jsx`, que antes solo rotaba.
+- **`frontend/src/components/Pieza2D.jsx`**: el alzado acotado en SVG,
+  compartiendo la misma convención geométrica (separación de barrotes,
+  marco perimetral) que `Pieza3D.jsx` y que `dominio/despiece.py` — si el
+  dibujo de pantalla y el de la lista de corte no coincidieran, se pierde
+  la confianza en los dos.
+- Conectado como vista previa en `Cotizador.jsx` (2D + 3D lado a lado, en
+  vivo mientras se llena el formulario) sin tocar el flujo de envío
+  existente — el modo de dibujo se infiere del material elegido
+  (hierro→barrotes, aluminio→cancel, vidrio→vidrio) porque el cotizador
+  todavía no pregunta el tipo de trabajo explícitamente.
+- Limpieza de recursos (`renderer.dispose()`, geometrías y materiales) en
+  ambos componentes al desmontar.
+
+**Pendiente, no incluido en este alcance:** cotas visibles dentro de la
+propia escena 3D (hoy solo están en el alzado 2D) — requeriría texto en la
+escena (sprites o `CSS2DRenderer`), una dependencia/complejidad adicional
+que no se justificó todavía. **Importante:** estos cambios de frontend se
+validaron con `vite build` (compila sin errores) y revisión de código, pero
+**no se probaron en un navegador real** — este entorno no tiene uno
+disponible. Antes de dar por buena la vista previa, ábrela en `npm run dev`
+y confirma que rota, hace zoom y se ve razonable con medidas reales.
+
 ## Estructura
 ```
 herreria-los-mejia/
