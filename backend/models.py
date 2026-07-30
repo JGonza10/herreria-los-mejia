@@ -258,6 +258,10 @@ class Proyecto(db.Model):
     avance_porcentaje = db.Column(db.Integer, default=0)
     notas_internas = db.Column(db.Text, nullable=True)
     fecha_estimada_entrega = db.Column(db.Date, nullable=True)
+    # Fase 8.1: costo real de material, capturado a mano por el
+    # administrador al conciliar el proyecto (comprar materia prima no está
+    # automatizado en ningún lado) — nullable hasta que se concilie.
+    costo_material_real = db.Column(db.Numeric(10, 2), nullable=True)
     creado_en = db.Column(db.DateTime, default=datetime.utcnow)
     actualizado_en = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -266,10 +270,15 @@ class Proyecto(db.Model):
     trabajador = db.relationship("Usuario", foreign_keys=[trabajador_id])
     pagos = db.relationship("Pago", back_populates="proyecto", cascade="all, delete-orphan", order_by="Pago.fecha")
     fotos = db.relationship("FotoAvance", back_populates="proyecto", cascade="all, delete-orphan", order_by="FotoAvance.creado_en")
+    registros_horas = db.relationship("RegistroHoras", back_populates="proyecto", cascade="all, delete-orphan", order_by="RegistroHoras.fecha")
 
     @property
     def total_pagado(self):
         return sum((float(p.monto) for p in self.pagos), 0.0)
+
+    @property
+    def total_horas(self):
+        return sum((float(r.horas) for r in self.registros_horas), 0.0)
 
     def to_dict(self):
         precio_total = float(self.cotizacion.total) if self.cotizacion.total is not None else float(self.cotizacion.precio_estimado)
@@ -293,6 +302,9 @@ class Proyecto(db.Model):
             "saldo": round(precio_total - self.total_pagado, 2),
             "pagos": [p.to_dict() for p in self.pagos],
             "fotos": [f.to_dict() for f in self.fotos],
+            "costo_material_real": float(self.costo_material_real) if self.costo_material_real is not None else None,
+            "total_horas": round(self.total_horas, 2),
+            "registros_horas": [r.to_dict() for r in self.registros_horas],
         }
 
 
@@ -449,3 +461,34 @@ def registrar_bitacora(usuario_id, entidad, entidad_id, accion, antes=None, desp
         usuario_id=usuario_id, entidad=entidad, entidad_id=entidad_id,
         accion=accion, antes=antes, despues=despues,
     ))
+
+
+class RegistroHoras(db.Model):
+    """Horas trabajadas por un trabajador en un proyecto (Fase 8.3) — para
+    calibrar la mano de obra con datos en vez de con corazonada. Hoy
+    '320 $/m²' es un número inventado; con dos meses de registro deja de
+    serlo."""
+    __tablename__ = "registro_horas"
+
+    id = db.Column(db.Integer, primary_key=True)
+    proyecto_id = db.Column(db.Integer, db.ForeignKey("proyectos.id"), nullable=False, index=True)
+    trabajador_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
+    horas = db.Column(db.Numeric(6, 2), nullable=False)
+    fecha = db.Column(db.Date, nullable=False)
+    notas = db.Column(db.String(200), nullable=True)
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow)
+
+    proyecto = db.relationship("Proyecto", back_populates="registros_horas")
+    trabajador = db.relationship("Usuario")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "proyecto_id": self.proyecto_id,
+            "trabajador_id": self.trabajador_id,
+            "trabajador_nombre": self.trabajador.nombre if self.trabajador else None,
+            "horas": float(self.horas),
+            "fecha": self.fecha.isoformat(),
+            "notas": self.notas,
+            "creado_en": self.creado_en.isoformat(),
+        }

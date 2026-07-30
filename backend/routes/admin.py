@@ -12,6 +12,7 @@ from validacion import numero
 from dominio.despiece import despiece
 from dominio.precios import cotizar_partida
 from routes.cotizador import VIGENCIA_DIAS, TASA_IVA
+from reportes import costo_real_por_proyecto, tasa_conversion_por_tipo, tasa_conversion_por_rango_precio, horas_por_m2
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -406,6 +407,10 @@ def actualizar_proyecto_admin(proyecto_id):
         proyecto.avance_porcentaje = max(0, min(100, int(numero(data["avance_porcentaje"], "avance_porcentaje", minimo=0, maximo=100))))
     if "notas_internas" in data:
         proyecto.notas_internas = data["notas_internas"]
+    if "costo_material_real" in data:
+        # Fase 8.1: costo real, capturado a mano al conciliar el proyecto —
+        # no hay ninguna integración de compras que lo llene solo.
+        proyecto.costo_material_real = numero(data["costo_material_real"], "costo_material_real", minimo=0)
 
     db.session.commit()
     return jsonify(proyecto.to_dict())
@@ -510,3 +515,43 @@ def listar_bitacora():
         query = query.filter_by(entidad_id=int(numero(entidad_id, "entidad_id", minimo=1)))
     registros = query.order_by(Bitacora.creado_en.desc()).limit(200).all()
     return jsonify([r.to_dict() for r in registros])
+
+
+# ---------- Los números del negocio (Fase 8) ----------
+
+@admin_bp.get("/reportes/costo-real")
+@requiere_rol("administrador")
+def reporte_costo_real():
+    """El único reporte que realmente importa: revela qué tipo de pieza
+    deja dinero y cuál se cotiza por debajo del costo."""
+    return jsonify(costo_real_por_proyecto())
+
+
+@admin_bp.get("/reportes/conversion")
+@requiere_rol("administrador")
+def reporte_conversion():
+    return jsonify({
+        "por_tipo": tasa_conversion_por_tipo(),
+        "por_rango_precio": tasa_conversion_por_rango_precio(),
+    })
+
+
+@admin_bp.get("/reportes/horas-por-m2")
+@requiere_rol("administrador")
+def reporte_horas_por_m2():
+    return jsonify(horas_por_m2())
+
+
+@admin_bp.get("/reportes/excel")
+@requiere_rol("administrador")
+def reporte_excel():
+    from reportes_excel import generar_reportes_excel
+    buffer = generar_reportes_excel(
+        costo_real_por_proyecto(), tasa_conversion_por_tipo(),
+        tasa_conversion_por_rango_precio(), horas_por_m2(),
+    )
+    return send_file(
+        buffer,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True, download_name="reportes-los-mejia.xlsx",
+    )

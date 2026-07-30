@@ -274,6 +274,32 @@ registrar pago, galería de fotos, tablero de seguimiento, calendario de
 agenda, vista de la bitácora) — los ocho endpoints están hechos y probados,
 pero se consumen hoy solo por API.
 
+## Los números del negocio (Fase 8)
+Todo lo anterior recopila datos; esta fase los usa (`backend/reportes.py`).
+
+- **8.1 Costo real contra cotizado** (`GET /api/admin/reportes/costo-real`)
+  — el único reporte que realmente importa. `Proyecto.costo_material_real`
+  se captura a mano al conciliar (no hay integración de compras); la mano
+  de obra se valora con las horas registradas (8.3) × `COSTO_HORA_ASUMIDO`
+  ($120/hora, ajustable en `reportes.py`). Mientras no se capture el costo
+  real, el reporte devuelve `null` en vez de inventar un número.
+- **8.2 Tasa de conversión** (`GET /api/admin/reportes/conversion`) por tipo
+  de trabajo y por rango de precio (`$0–5,000`, `$5,000–15,000`,
+  `$15,000–30,000`, `$30,000+`) — si el 90% de los portones se aprueban y
+  el 20% de los canceles, hay algo que corregir en el precio del cancel o
+  en cómo se presenta.
+- **8.3 Horas por m²** — tabla `RegistroHoras`; `POST
+  /api/trabajador/proyectos/<id>/horas` (el trabajador registra sus propias
+  horas). `GET /api/admin/reportes/horas-por-m2` calcula el real contra el
+  `320 $/m²` que hoy es un número inventado.
+- **8.4 Exportar a Excel** (`GET /api/admin/reportes/excel`, `XlsxWriter`,
+  ya estaba instalado): un libro con las 4 hojas de arriba, para el
+  contador.
+
+**Pendiente, no incluido en este alcance:** pantallas de frontend (el
+trabajador registra horas hoy solo por API; el administrador captura el
+costo real igual). Con esto se cierran las 8 fases de `actualizar.md`.
+
 ## Estructura
 ```
 herreria-los-mejia/
