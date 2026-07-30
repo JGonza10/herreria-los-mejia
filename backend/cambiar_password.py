@@ -48,6 +48,7 @@ def main():
         print(f"Usuario: {usuario.nombre} ({usuario.rol})")
         password = pedir_password_nueva()
         usuario.set_password(password)
+        usuario.token_version += 1  # invalida cualquier token de sesión que ya tuviera
         db.session.commit()
         print(f"Contraseña actualizada para {args.email}.")
 

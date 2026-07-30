@@ -17,6 +17,11 @@ class Usuario(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     rol = db.Column(db.String(20), nullable=False, default="cliente")
     activo = db.Column(db.Boolean, default=True)
+    # Incluida en cada token de sesión y verificada al validarlo (ver auth.py).
+    # Subirla invalida de golpe todas las sesiones activas de este usuario —
+    # los tokens son sin estado y viven 30 días, así que es la única forma
+    # barata de revocarlos si a alguien le roban uno.
+    token_version = db.Column(db.Integer, nullable=False, default=0)
     creado_en = db.Column(db.DateTime, default=datetime.utcnow)
 
     def set_password(self, password):
@@ -81,9 +86,12 @@ class PrecioMaterial(db.Model):
 
 class Cotizacion(db.Model):
     __tablename__ = "cotizaciones"
+    __table_args__ = (
+        db.Index("ix_cotizaciones_estado_creado_en", "estado", "creado_en"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
-    cliente_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=True, index=True)
     producto_id = db.Column(db.Integer, db.ForeignKey("productos.id"), nullable=True)
 
     nombre_cliente = db.Column(db.String(120), nullable=False)
@@ -127,6 +135,9 @@ class Cotizacion(db.Model):
 class Proyecto(db.Model):
     """Un pedido en curso, generado al aprobar una cotización."""
     __tablename__ = "proyectos"
+    __table_args__ = (
+        db.Index("ix_proyectos_trabajador_estado", "trabajador_id", "estado"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     cotizacion_id = db.Column(db.Integer, db.ForeignKey("cotizaciones.id"), nullable=False)

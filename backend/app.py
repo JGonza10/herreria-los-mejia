@@ -1,5 +1,7 @@
+import logging
 import os
-from flask import Flask, jsonify, send_from_directory
+import sys
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
@@ -14,7 +16,18 @@ from routes.cliente import cliente_bp
 from routes.escalera import escalera_bp
 
 
+def _configurar_logging():
+    # Logging estructurado a stdout: Railway captura stdout y lo indexa solo.
+    # Sin esto, "me marcó error" no tiene forma de investigarse después.
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    root = logging.getLogger()
+    root.handlers = [handler]
+    root.setLevel(logging.INFO)
+
+
 def create_app():
+    _configurar_logging()
     app = Flask(__name__)
 
     db_url = os.environ.get("DATABASE_URL", "sqlite:///local.db")
@@ -46,6 +59,11 @@ def create_app():
     app.config["UPLOAD_FOLDER"] = os.environ.get("UPLOAD_FOLDER", os.path.join(app.root_path, "uploads"))
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
+    # Límite duro al tamaño de cualquier petición (principalmente las subidas
+    # de imágenes del catálogo) — sin esto, un archivo enorme se procesa
+    # entero antes de que algo lo rechace.
+    app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
+
     db.init_app(app)
     limiter.init_app(app)
     migrate.init_app(app, db)
@@ -61,6 +79,11 @@ def create_app():
     app.register_blueprint(trabajador_bp, url_prefix="/api/trabajador")
     app.register_blueprint(cliente_bp, url_prefix="/api/cliente")
     app.register_blueprint(escalera_bp, url_prefix="/api/escalera")
+
+    @app.after_request
+    def log_peticion(response):
+        app.logger.info(f"{request.method} {request.path} -> {response.status_code}")
+        return response
 
     @app.get("/api/salud")
     def salud():

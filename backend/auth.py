@@ -18,8 +18,8 @@ def _serializer():
     return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="auth-token")
 
 
-def generar_token(usuario_id):
-    return _serializer().dumps({"user_id": usuario_id})
+def generar_token(usuario):
+    return _serializer().dumps({"user_id": usuario.id, "tv": usuario.token_version})
 
 
 def _token_de_request():
@@ -37,7 +37,10 @@ def usuario_actual():
         datos = _serializer().loads(token, max_age=TOKEN_MAX_AGE)
     except (BadSignature, SignatureExpired):
         return None
-    return Usuario.query.get(datos.get("user_id"))
+    usuario = Usuario.query.get(datos.get("user_id"))
+    if not usuario or usuario.token_version != datos.get("tv"):
+        return None
+    return usuario
 
 
 def requiere_login(f):

@@ -28,6 +28,22 @@ variables de entorno `SEED_ADMIN_PASSWORD`, `SEED_TRABAJADOR_PASSWORD` y
 `SEED_CLIENTE_PASSWORD` (mínimo 12 caracteres cada una) y se niega a correr
 si faltan. Ver `.env.example`.
 
+## Contraseñas y sesiones
+- `POST /api/auth/password` (logueado): cambia tu propia contraseña, pide la
+  actual y la nueva.
+- `PUT /api/admin/usuarios/<id>/password` (solo administrador): restablece la
+  contraseña de cualquier usuario desde el panel de Equipo.
+- **No hay recuperación de contraseña por correo, y es deliberado.** Para un
+  taller de este tamaño no vale la pena la complejidad de correos
+  transaccionales — si alguien olvida su contraseña, el administrador se la
+  restablece desde el panel. Si el negocio crece a un punto donde esto ya no
+  alcanza, se reconsidera.
+- Los tokens de sesión no tienen estado y viven 30 días; cambiar una
+  contraseña (por cualquiera de las dos vías de arriba) sube el
+  `token_version` del usuario, lo que invalida de inmediato cualquier otro
+  token que esa persona tuviera activo — la única forma barata de revocar
+  una sesión sin mantener una lista negra de tokens.
+
 ## Estructura
 ```
 herreria-los-mejia/
@@ -113,6 +129,29 @@ Para hacerlo persistente en Railway:
 1. En tu servicio backend → pestaña **Volumes** → **+ New Volume**.
 2. Móntalo en la ruta `/app/uploads` (o donde quede tu carpeta de la app).
 3. Agrega la variable de entorno `UPLOAD_FOLDER=/app/uploads` al servicio.
+
+## Observabilidad y respaldos
+- **Logging estructurado a stdout:** cada petición queda en los logs
+  (método, ruta, código de respuesta) y cualquier error no manejado se
+  registra completo con `app.logger.exception` antes de responder un 500
+  genérico — así "me marcó error" se puede investigar después. Railway
+  captura stdout automáticamente, se ve en la pestaña **Logs** del servicio.
+- **Sentry** (plan gratuito) da alertas en tiempo real y agrupa errores
+  repetidos — no está integrado todavía porque requiere una cuenta propia.
+  Si se quiere agregar: `pip install sentry-sdk[flask]`, y en `app.py`,
+  `sentry_sdk.init(dsn=os.environ["SENTRY_DSN"])` antes de crear la app.
+- **Respaldos de PostgreSQL:** confirma en el dashboard de Railway (plan del
+  servicio de PostgreSQL) si ya incluye respaldos automáticos. Si no,
+  `backend/respaldar_db.py` genera un dump manual:
+  ```bash
+  DATABASE_URL="<la url real de producción>" python respaldar_db.py
+  ```
+  Prográmalo semanal (Programador de tareas de Windows, cron, o un Cron Job
+  de Railway) y guarda el resultado fuera de Railway (un bucket, o hasta
+  Drive) — la lista de precios y el historial de cotizaciones del taller no
+  existen en ningún otro lado.
+- **`MAX_CONTENT_LENGTH`** de 8 MB en la app: una subida más grande responde
+  413 antes de procesarse entera, en vez de tumbar el servicio.
 
 Sin esto, el sitio sigue funcionando normal — solo tendrías que volver a
 subir las imágenes si el servicio se redespliega.

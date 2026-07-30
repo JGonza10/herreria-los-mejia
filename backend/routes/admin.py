@@ -199,3 +199,22 @@ def crear_usuario():
     db.session.add(usuario)
     db.session.commit()
     return jsonify(usuario.to_dict()), 201
+
+
+@admin_bp.put("/usuarios/<int:usuario_id>/password")
+@requiere_rol("administrador")
+def restablecer_password(usuario_id):
+    """No hay recuperación de contraseña por correo (decisión deliberada,
+    ver README): el administrador la restablece desde aquí. Invalida
+    también cualquier sesión que esa persona tuviera abierta."""
+    usuario = Usuario.query.get_or_404(usuario_id)
+    data = request.get_json(force=True)
+    password_nueva = data.get("password_nueva", "")
+
+    if len(password_nueva) < 6:
+        return jsonify({"error": "La contraseña nueva debe tener al menos 6 caracteres."}), 400
+
+    usuario.set_password(password_nueva)
+    usuario.token_version += 1
+    db.session.commit()
+    return jsonify({"ok": True})
