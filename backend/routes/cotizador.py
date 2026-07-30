@@ -1,8 +1,8 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from flask import Blueprint, jsonify, request
 from extensions import db
 from models import PrecioMaterial, Cotizacion, Partida, Producto, Tarifa, TipoTrabajo
-from auth import usuario_actual
+from auth import usuario_actual, generar_token_cotizacion, leer_token_cotizacion
 from validacion import numero
 from dominio.precios import calcular_precio, cotizar_partida
 from dominio.spec import construir_basico
@@ -107,7 +107,7 @@ def solicitar_cotizacion():
     db.session.add(cotizacion)
     db.session.commit()
 
-    return jsonify(cotizacion.to_dict()), 201
+    return jsonify({**cotizacion.to_dict(), "token_publico": generar_token_cotizacion(cotizacion.id)}), 201
 
 
 def _solicitar_multiple(data):
@@ -202,4 +202,39 @@ def _solicitar_multiple(data):
     cotizacion.folio = f"LM-{date.today().year}-{cotizacion.id:04d}"
     db.session.commit()
 
-    return jsonify(cotizacion.to_dict()), 201
+    return jsonify({**cotizacion.to_dict(), "token_publico": generar_token_cotizacion(cotizacion.id)}), 201
+
+
+@cotizador_bp.get("/publica/<token>")
+def ver_cotizacion_publica(token):
+    """Link público de la Fase 7.1 — el cliente ve su ficha con el dibujo
+    (cuando exista) y un botón de 'Acepto esta cotización'. El token en sí
+    no expira; la vigencia real la marca vigencia_hasta."""
+    cotizacion_id = leer_token_cotizacion(token)
+    if not cotizacion_id:
+        return jsonify({"error": "Enlace inválido."}), 404
+    cotizacion = Cotizacion.query.get_or_404(cotizacion_id)
+    datos = cotizacion.to_dict()
+    datos["vencida"] = bool(cotizacion.vigencia_hasta and cotizacion.vigencia_hasta < date.today())
+    return jsonify(datos)
+
+
+@cotizador_bp.post("/publica/<token>/aceptar")
+def aceptar_cotizacion_publica(token):
+    """Guarda fecha, hora e IP de la aceptación — no es un contrato ante
+    notario, pero es infinitamente mejor que 'usted me dijo que sí por
+    teléfono'."""
+    cotizacion_id = leer_token_cotizacion(token)
+    if not cotizacion_id:
+        return jsonify({"error": "Enlace inválido."}), 404
+    cotizacion = Cotizacion.query.get_or_404(cotizacion_id)
+
+    if cotizacion.vigencia_hasta and cotizacion.vigencia_hasta < date.today():
+        return jsonify({"error": "Esta cotización ya venció. Pide que te la revivan con los precios actuales."}), 400
+    if cotizacion.aceptada_en:
+        return jsonify({"error": "Esta cotización ya había sido aceptada."}), 400
+
+    cotizacion.aceptada_en = datetime.utcnow()
+    cotizacion.aceptada_ip = request.remote_addr
+    db.session.commit()
+    return jsonify(cotizacion.to_dict())

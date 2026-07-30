@@ -3,7 +3,7 @@ from extensions import db
 from werkzeug.security import generate_password_hash, check_password_hash
 
 ROLES = ("administrador", "trabajador", "cliente")
-ESTADOS_COTIZACION = ("nueva", "revisada", "aprobada", "rechazada")
+ESTADOS_COTIZACION = ("nueva", "revisada", "aprobada", "rechazada", "vencida")
 ESTADOS_PROYECTO = ("pendiente", "en_proceso", "terminado", "entregado", "cancelado")
 SISTEMAS = ("herreria", "aluminio", "cristal_templado")
 UNIDADES_TIPO_TRABAJO = ("m2", "ml")
@@ -161,6 +161,12 @@ class Cotizacion(db.Model):
     total = db.Column(db.Numeric(12, 2), nullable=True)
     tarifa_id = db.Column(db.Integer, db.ForeignKey("tarifas.id"), nullable=True)
 
+    # Fase 7.1: aceptación por el cliente vía link público con token firmado
+    # (ver auth.py, generar_token_cotizacion). No es un contrato ante
+    # notario, pero es mejor que "usted me dijo que sí por teléfono".
+    aceptada_en = db.Column(db.DateTime, nullable=True)
+    aceptada_ip = db.Column(db.String(45), nullable=True)
+
     producto = db.relationship("Producto")
     proyecto = db.relationship("Proyecto", back_populates="cotizacion", uselist=False)
     partidas = db.relationship("Partida", back_populates="cotizacion", cascade="all, delete-orphan", order_by="Partida.orden")
@@ -192,6 +198,8 @@ class Cotizacion(db.Model):
             "tarifa_id": self.tarifa_id,
             "partidas": [p.to_dict() for p in self.partidas],
             "tiene_proyecto": self.proyecto is not None,
+            "aceptada_en": self.aceptada_en.isoformat() if self.aceptada_en else None,
+            "aceptada_ip": self.aceptada_ip,
             "creado_en": self.creado_en.isoformat(),
         }
 
@@ -256,8 +264,15 @@ class Proyecto(db.Model):
     cotizacion = db.relationship("Cotizacion", back_populates="proyecto")
     cliente = db.relationship("Usuario", foreign_keys=[cliente_id])
     trabajador = db.relationship("Usuario", foreign_keys=[trabajador_id])
+    pagos = db.relationship("Pago", back_populates="proyecto", cascade="all, delete-orphan", order_by="Pago.fecha")
+    fotos = db.relationship("FotoAvance", back_populates="proyecto", cascade="all, delete-orphan", order_by="FotoAvance.creado_en")
+
+    @property
+    def total_pagado(self):
+        return sum((float(p.monto) for p in self.pagos), 0.0)
 
     def to_dict(self):
+        precio_total = float(self.cotizacion.total) if self.cotizacion.total is not None else float(self.cotizacion.precio_estimado)
         return {
             "id": self.id,
             "cotizacion_id": self.cotizacion_id,
@@ -274,6 +289,10 @@ class Proyecto(db.Model):
             "actualizado_en": self.actualizado_en.isoformat(),
             "material": self.cotizacion.material,
             "precio_estimado": float(self.cotizacion.precio_estimado),
+            "total_pagado": round(self.total_pagado, 2),
+            "saldo": round(precio_total - self.total_pagado, 2),
+            "pagos": [p.to_dict() for p in self.pagos],
+            "fotos": [f.to_dict() for f in self.fotos],
         }
 
 
@@ -330,3 +349,103 @@ class PrecioTarifa(db.Model):
             "unidad": self.unidad,
             "precio": float(self.precio),
         }
+
+
+class Pago(db.Model):
+    """Un anticipo o pago parcial de un proyecto (Fase 7.2). Las herrerías
+    viven del anticipo: 50% para comprar material, 50% contra entrega — y
+    hasta ahora no había dónde registrarlo."""
+    __tablename__ = "pagos"
+
+    id = db.Column(db.Integer, primary_key=True)
+    proyecto_id = db.Column(db.Integer, db.ForeignKey("proyectos.id"), nullable=False, index=True)
+    monto = db.Column(db.Numeric(10, 2), nullable=False)
+    metodo = db.Column(db.String(30), nullable=True)   # efectivo, transferencia...
+    fecha = db.Column(db.Date, nullable=False)
+    comprobante_url = db.Column(db.String(300), nullable=True)
+    registrado_por_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=True)
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow)
+
+    proyecto = db.relationship("Proyecto", back_populates="pagos")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "proyecto_id": self.proyecto_id,
+            "monto": float(self.monto),
+            "metodo": self.metodo,
+            "fecha": self.fecha.isoformat(),
+            "comprobante_url": self.comprobante_url,
+            "registrado_por_id": self.registrado_por_id,
+            "creado_en": self.creado_en.isoformat(),
+        }
+
+
+class FotoAvance(db.Model):
+    """Foto de avance de un proyecto, subida por el trabajador desde el
+    teléfono (Fase 7.3) — reduce las llamadas de '¿cómo va mi portón?'."""
+    __tablename__ = "fotos_avance"
+
+    id = db.Column(db.Integer, primary_key=True)
+    proyecto_id = db.Column(db.Integer, db.ForeignKey("proyectos.id"), nullable=False, index=True)
+    url = db.Column(db.String(300), nullable=False)
+    subida_por_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=True)
+    notas = db.Column(db.String(200), nullable=True)
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow)
+
+    proyecto = db.relationship("Proyecto", back_populates="fotos")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "proyecto_id": self.proyecto_id,
+            "url": self.url,
+            "subida_por_id": self.subida_por_id,
+            "notas": self.notas,
+            "creado_en": self.creado_en.isoformat(),
+        }
+
+
+class Bitacora(db.Model):
+    """Auditoría de cambios sensibles (Fase 7.6): precios, estados,
+    asignaciones. Con tres roles y varias personas tocando los mismos
+    registros, '¿quién le bajó el precio a esta cotización?' es una
+    pregunta que se va a hacer — conviene que tenga respuesta."""
+    __tablename__ = "bitacora"
+    __table_args__ = (
+        db.Index("ix_bitacora_entidad", "entidad", "entidad_id"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=True)
+    entidad = db.Column(db.String(40), nullable=False)   # "cotizacion", "proyecto", "tarifa"...
+    entidad_id = db.Column(db.Integer, nullable=False)
+    accion = db.Column(db.String(40), nullable=False)    # "cambio_precio", "cambio_estado", "asignacion"...
+    antes = db.Column(db.JSON, nullable=True)
+    despues = db.Column(db.JSON, nullable=True)
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow)
+
+    usuario = db.relationship("Usuario")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "usuario_id": self.usuario_id,
+            "usuario_nombre": self.usuario.nombre if self.usuario else None,
+            "entidad": self.entidad,
+            "entidad_id": self.entidad_id,
+            "accion": self.accion,
+            "antes": self.antes,
+            "despues": self.despues,
+            "creado_en": self.creado_en.isoformat(),
+        }
+
+
+def registrar_bitacora(usuario_id, entidad, entidad_id, accion, antes=None, despues=None):
+    """Helper para no repetir el patrón en cada ruta que cambia algo
+    sensible — no hace commit, se agrega a la misma transacción del
+    caller."""
+    db.session.add(Bitacora(
+        usuario_id=usuario_id, entidad=entidad, entidad_id=entidad_id,
+        accion=accion, antes=antes, despues=despues,
+    ))

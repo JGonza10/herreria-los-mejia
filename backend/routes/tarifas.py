@@ -12,7 +12,7 @@ seed.py, hacer commit y redesplegar. Un dueño de taller no va a hacer eso.
 from datetime import date, datetime
 from flask import Blueprint, jsonify, request
 from extensions import db
-from models import Tarifa, PrecioTarifa
+from models import Tarifa, PrecioTarifa, registrar_bitacora
 from auth import requiere_rol, usuario_actual
 from validacion import numero
 
@@ -64,6 +64,7 @@ def reemplazar_precios(tarifa_id):
     if not isinstance(precios, list):
         return jsonify({"error": "'precios' debe ser una lista."}), 400
 
+    precios_antes = [p.to_dict() for p in tarifa.precios]
     nuevos = []
     for fila in precios:
         if not isinstance(fila, dict) or not fila.get("concepto") or not fila.get("clave") or not fila.get("unidad"):
@@ -79,6 +80,9 @@ def reemplazar_precios(tarifa_id):
 
     PrecioTarifa.query.filter_by(tarifa_id=tarifa.id).delete()
     db.session.add_all(nuevos)
+    db.session.flush()  # para que los nuevos ya tengan id al registrarlos en la bitácora
+    registrar_bitacora(usuario_actual().id, "tarifa", tarifa.id, "cambio_precio",
+                        antes={"precios": precios_antes}, despues={"precios": [n.to_dict() for n in nuevos]})
     db.session.commit()
     return jsonify(tarifa.to_dict(con_precios=True))
 
@@ -87,8 +91,11 @@ def reemplazar_precios(tarifa_id):
 @requiere_rol("administrador")
 def activar_tarifa(tarifa_id):
     tarifa = Tarifa.query.get_or_404(tarifa_id)
+    anterior = Tarifa.query.filter_by(activa=True).first()
     Tarifa.query.update({Tarifa.activa: False})
     tarifa.activa = True
+    registrar_bitacora(usuario_actual().id, "tarifa", tarifa.id, "activacion",
+                        antes={"tarifa_activa_id": anterior.id if anterior else None}, despues={"tarifa_activa_id": tarifa.id})
     db.session.commit()
     return jsonify(tarifa.to_dict())
 

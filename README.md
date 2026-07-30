@@ -218,6 +218,62 @@ validaron con `vite build` (compila sin errores) y revisión de código, pero
 disponible. Antes de dar por buena la vista previa, ábrela en `npm run dev`
 y confirma que rota, hace zoom y se ve razonable con medidas reales.
 
+## Operación del taller (Fase 7)
+
+**7.1 — Aceptación por el cliente.** Cada cotización trae un `token_publico`
+firmado (`itsdangerous`, igual que los tokens de sesión — nada nuevo que
+mantener). `GET /api/cotizador/publica/<token>` (sin login) muestra la
+ficha; `POST .../aceptar` guarda fecha, hora e IP de la aceptación
+(`Cotizacion.aceptada_en/aceptada_ip`). No es un contrato ante notario, pero
+es mejor que "usted me dijo que sí por teléfono". Una cotización vencida
+(`vigencia_hasta` pasada) no se puede aceptar.
+
+**7.2 — Anticipos y estado de cuenta.** Tabla `Pago` (monto, método, fecha,
+comprobante). `POST /api/admin/proyectos/<id>/pagos` registra uno.
+**Ningún proyecto puede pasar a `en_proceso` sin al menos un pago
+registrado** — la regla se aplica igual desde el panel de admin y desde el
+panel de trabajador, y evita el problema más caro de un taller chico:
+comprar material para un trabajo que se cayó. `Proyecto.to_dict()` incluye
+`total_pagado` y `saldo`. No se integró pasarela de pagos en línea
+(decisión explícita del plan original, sección "Lo que no recomiendo").
+
+**7.3 — Seguimiento con fotos.** Tabla `FotoAvance`. `POST
+/api/trabajador/proyectos/<id>/fotos` (multipart, reutiliza el
+`guardar_imagen` que ya existía para el catálogo) — solo el trabajador
+asignado puede subir. La compresión del lado del cliente
+(`canvas.toBlob` calidad 0.7) queda pendiente en el frontend, que no se
+tocó en este alcance.
+
+**7.4 — Vigencia y seguimiento.** `backend/vencer_cotizaciones.py`: script
+para correr una vez al día (Cron Job de Railway) que marca `estado=vencida`
+a lo que ya pasó su `vigencia_hasta` sin ser aceptado ni rechazado.
+`POST /api/admin/cotizaciones/<id>/revivir` la reactiva recalculando con la
+tarifa **activa**, no con la vieja. `GET /api/admin/cotizaciones/seguimiento`
+agrupa lo que no ha tenido respuesta en baldes de 3/7/15+ días — la mayoría
+de las cotizaciones no se pierden por precio, se pierden por falta de
+seguimiento. El listado de cotizaciones también trae un `link_whatsapp`
+prellenado (`wa.me`, un `<a href>`, no una integración).
+
+**7.5 — Agenda y capacidad.** Al aprobar una cotización, `fecha_estimada_entrega`
+se calcula a partir de la carga real de los proyectos activos (constante
+`CAPACIDAD_SEMANAL` en `routes/admin.py` — ajustable, no hay pantalla de
+configuración todavía), no del optimismo. `GET /api/admin/agenda` agrupa
+los proyectos activos por semana de entrega y marca si alguna semana está
+sobrecargada.
+
+**7.6 — Bitácora de auditoría.** Tabla `Bitacora` (`usuario_id`, `entidad`,
+`entidad_id`, `accion`, `antes`, `despues`). Conectada en los cambios de
+precio y activación de tarifa, y en los cambios de estado y asignación de
+proyecto (desde admin y desde trabajador). `GET /api/admin/bitacora`
+(filtrable por `entidad`/`entidad_id`) responde "¿quién le bajó el precio a
+esta cotización?".
+
+**Pendiente, no incluido en este alcance:** las pantallas de frontend para
+todo lo anterior (botón de aceptar en una página pública, formulario de
+registrar pago, galería de fotos, tablero de seguimiento, calendario de
+agenda, vista de la bitácora) — los ocho endpoints están hechos y probados,
+pero se consumen hoy solo por API.
+
 ## Estructura
 ```
 herreria-los-mejia/

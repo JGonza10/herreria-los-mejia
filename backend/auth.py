@@ -43,6 +43,24 @@ def usuario_actual():
     return usuario
 
 
+def _serializer_cotizacion():
+    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="cotizacion-token")
+
+
+def generar_token_cotizacion(cotizacion_id):
+    """Link público de aceptación (Fase 7.1) — no expira por sí mismo, la
+    vigencia real la controla Cotizacion.vigencia_hasta al validar."""
+    return _serializer_cotizacion().dumps({"cotizacion_id": cotizacion_id})
+
+
+def leer_token_cotizacion(token):
+    try:
+        datos = _serializer_cotizacion().loads(token)
+    except BadSignature:
+        return None
+    return datos.get("cotizacion_id")
+
+
 def requiere_login(f):
     @wraps(f)
     def envoltura(*args, **kwargs):
