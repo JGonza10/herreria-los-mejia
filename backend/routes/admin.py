@@ -1,11 +1,12 @@
 import os
 import uuid
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, jsonify, request, current_app, send_file
 from werkzeug.utils import secure_filename
 from extensions import db
-from models import Producto, Cotizacion, Proyecto, Usuario, ESTADOS_PROYECTO
+from models import Producto, Cotizacion, Partida, Proyecto, Usuario, ESTADOS_PROYECTO
 from auth import requiere_rol
 from validacion import numero
+from dominio.despiece import despiece
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -181,6 +182,67 @@ def simular_cotizacion(cotizacion_id):
         "estimado_cliente_min": round(total * 0.9, 2),
         "estimado_cliente_max": round(total * 1.1, 2),
     })
+
+
+# ---------- Despiece (lista de corte, Fase 5.1) ----------
+
+@admin_bp.post("/partidas/<int:partida_id>/despiece")
+@requiere_rol("administrador", "trabajador")
+def despiece_de_partida(partida_id):
+    """De la especificación ya guardada de una partida, saca cuántos tramos
+    de perfil hacen falta y cómo acomodarlos en barras de 6 m. Aplica solo
+    a piezas rectangulares con barrotes (portones, rejas, protecciones) —
+    no a escalera ni a cancelería/vidrio."""
+    partida = Partida.query.get_or_404(partida_id)
+    data = request.get_json(silent=True) or {}
+    merma_pct_teorica = numero(data.get("merma_pct_teorica", 7), "merma_pct_teorica", minimo=0, maximo=100)
+    admite_barrotes = partida.tipo_trabajo.admite_barrotes if partida.tipo_trabajo else True
+    return jsonify(despiece(partida.spec, merma_pct_teorica=merma_pct_teorica, admite_barrotes=admite_barrotes))
+
+
+@admin_bp.get("/partidas/<int:partida_id>/orden-trabajo.pdf")
+@requiere_rol("administrador", "trabajador")
+def orden_trabajo_partida(partida_id):
+    """PDF de taller: lista de corte y herrajes, sin precios."""
+    partida = Partida.query.get_or_404(partida_id)
+    merma_pct_teorica = numero(request.args.get("merma_pct_teorica", 7), "merma_pct_teorica", minimo=0, maximo=100)
+    admite_barrotes = partida.tipo_trabajo.admite_barrotes if partida.tipo_trabajo else True
+    resultado = despiece(partida.spec, merma_pct_teorica=merma_pct_teorica, admite_barrotes=admite_barrotes)
+
+    from orden_trabajo_pdf import generar_orden_trabajo_pdf
+    buffer = generar_orden_trabajo_pdf(partida.cotizacion, partida, resultado)
+    nombre_archivo = f"orden-trabajo-{partida.cotizacion.folio or partida.cotizacion_id}-{partida.id}.pdf"
+    return send_file(buffer, mimetype="application/pdf", as_attachment=True, download_name=nombre_archivo)
+
+
+@admin_bp.get("/requisicion")
+@requiere_rol("administrador")
+def requisicion_material():
+    """Suma el material de todos los proyectos activos (Fase 5.2): cuántas
+    barras comerciales de 6 m hacen falta en total, para comprar una vez en
+    vez de ir al proveedor cada vez que se corta un trabajo. No distingue
+    calibre ni perfil todavía — el spec de hoy no captura esos datos (ver
+    dominio/spec.py) — así que es un total agregado, no una lista por
+    calibre."""
+    proyectos_activos = Proyecto.query.filter(Proyecto.estado.in_(("pendiente", "en_proceso"))).all()
+    total_barras = 0
+    detalle = []
+    for proyecto in proyectos_activos:
+        for partida in proyecto.cotizacion.partidas:
+            admite_barrotes = partida.tipo_trabajo.admite_barrotes if partida.tipo_trabajo else True
+            try:
+                resultado = despiece(partida.spec, admite_barrotes=admite_barrotes)
+            except (ValueError, KeyError, TypeError):
+                continue  # pieza sin medidas de barrotes calculables (p. ej. cristal templado sin marco)
+            total_barras += resultado["num_barras"]
+            detalle.append({
+                "proyecto_id": proyecto.id,
+                "proyecto_titulo": proyecto.titulo,
+                "partida_id": partida.id,
+                "descripcion": partida.descripcion,
+                "num_barras": resultado["num_barras"],
+            })
+    return jsonify({"total_barras_6m": total_barras, "detalle": detalle})
 
 
 # ---------- Proyectos (dashboard de pedidos) ----------

@@ -156,6 +156,35 @@ navegador real, que no está disponible en este entorno, y el plan pide
 confirmar antes con el dueño del taller si el cliente ve un precio exacto o
 un rango (recomendado: rango) antes de exponerlo en una pantalla pública.
 
+## Lista de corte y requisición de material (Fase 5)
+`backend/dominio/despiece.py` saca de la especificación de una partida
+cuántos tramos de perfil hacen falta (marco perimetral + barrotes
+verticales + travesaños) y los acomoda en barras comerciales de 6 m con
+*first-fit decreasing* — diez líneas resuelven el 90 % del beneficio, no
+hace falta un solver.
+
+- `POST /api/admin/partidas/<id>/despiece` — la lista de corte en JSON, más
+  la **merma real calculada contra la teórica que se cobró**. Si el taller
+  cobra 7 % de merma y en realidad desperdicia 14 %, está perdiendo dinero
+  en cada trabajo y hoy no había forma de saberlo.
+- `GET /api/admin/partidas/<id>/orden-trabajo.pdf` — PDF para el trabajador:
+  lista de corte y herrajes, **sin precios** (el trabajador no los necesita
+  y el cliente no debe verlos si la hoja se queda en la obra). Todavía sin
+  el alzado 2D de la pieza — depende del dibujo paramétrico genérico de la
+  Fase 6.
+- `GET /api/admin/requisicion` — suma las barras de 6 m que hacen falta en
+  todos los proyectos activos (`pendiente`/`en_proceso`), para comprar una
+  vez en vez de ir al proveedor cada vez que se corta un trabajo. Hoy es un
+  total agregado, no una lista por calibre — el spec actual no captura qué
+  perfil específico usa cada pieza.
+- Aplica a piezas rectangulares con marco (portones, rejas, protecciones,
+  barandal); respeta `TipoTrabajo.admite_barrotes` para no inventar
+  barrotes en cancelería o vidrio. No aplica a escalera, que tiene su
+  propia geometría (`dominio/geometria.py`, Fase 3).
+- Si no se capturó `separacion_barrotes_cm`, usa 12 cm por defecto (el
+  mismo valor del ejemplo de la Fase 2) — es un despiece de referencia, no
+  el definitivo del taller, hasta que el formulario capture esos datos.
+
 ## Estructura
 ```
 herreria-los-mejia/
