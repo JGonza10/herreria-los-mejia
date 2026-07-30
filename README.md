@@ -82,6 +82,16 @@ flask --app app db upgrade
 En Railway, el `Procfile` ya corre `flask --app app db upgrade` antes de
 levantar `gunicorn` en cada deploy.
 
+### Pruebas
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+Cubre el motor de precios del cotizador y las 4 calculadoras de escalera
+con casos de referencia (medidas conocidas → total/resultado esperado).
+Si una prueba truena después de tocar `cotizador.py` o `escalera.py`, es
+porque el cambio alteró un número que un cliente ya vio en una cotización.
+
 ### Frontend
 ```bash
 cd frontend
