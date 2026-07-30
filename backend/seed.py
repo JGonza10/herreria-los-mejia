@@ -15,7 +15,7 @@ import sys
 
 from app import create_app
 from extensions import db
-from models import PrecioMaterial, Producto, Usuario
+from models import PrecioMaterial, Producto, TipoTrabajo, Usuario
 
 app = create_app()
 
@@ -82,7 +82,23 @@ PRODUCTOS = [
     },
 ]
 
+TIPOS_TRABAJO = [
+    {"clave": "porton_corredizo", "nombre": "Portón corredizo", "sistema": "herreria", "unidad": "m2", "modo_dibujo": "barrotes"},
+    {"clave": "porton_abatible", "nombre": "Portón abatible", "sistema": "herreria", "unidad": "m2", "modo_dibujo": "barrotes"},
+    {"clave": "reja_cerca", "nombre": "Reja o cerca", "sistema": "herreria", "unidad": "m2", "modo_dibujo": "barrotes"},
+    {"clave": "proteccion_ventana", "nombre": "Protección para ventana", "sistema": "herreria", "unidad": "m2", "modo_dibujo": "barrotes"},
+    {"clave": "barandal", "nombre": "Barandal", "sistema": "herreria", "unidad": "ml", "altura_referencia_m": 1.00, "modo_dibujo": "estructura"},
+    {"clave": "canceleria", "nombre": "Cancelería", "sistema": "aluminio", "unidad": "m2", "modo_dibujo": "cancel", "admite_barrotes": False},
+    {"clave": "ventana_aluminio", "nombre": "Ventana de aluminio", "sistema": "aluminio", "unidad": "m2", "modo_dibujo": "cancel", "admite_barrotes": False},
+    {"clave": "puerta_cristal_templado", "nombre": "Puerta de cristal templado", "sistema": "cristal_templado", "unidad": "m2", "modo_dibujo": "vidrio", "admite_barrotes": False},
+    {"clave": "escalera", "nombre": "Escalera", "sistema": "herreria", "unidad": "ml", "modo_dibujo": "estructura", "admite_barrotes": False},
+]
+
 with app.app_context():
+    for t in TIPOS_TRABAJO:
+        if not TipoTrabajo.query.filter_by(clave=t["clave"]).first():
+            db.session.add(TipoTrabajo(**t))
+
     for p in PRECIOS:
         existente = PrecioMaterial.query.filter_by(material=p["material"]).first()
         if existente:

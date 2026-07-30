@@ -5,6 +5,39 @@ from werkzeug.security import generate_password_hash, check_password_hash
 ROLES = ("administrador", "trabajador", "cliente")
 ESTADOS_COTIZACION = ("nueva", "revisada", "aprobada", "rechazada")
 ESTADOS_PROYECTO = ("pendiente", "en_proceso", "terminado", "entregado", "cancelado")
+SISTEMAS = ("herreria", "aluminio", "cristal_templado")
+UNIDADES_TIPO_TRABAJO = ("m2", "ml")
+
+
+class TipoTrabajo(db.Model):
+    """Catálogo de qué se puede fabricar, en tabla (no enum en código) para
+    que el dueño pueda agregar tipos sin tocar código ni redesplegar."""
+    __tablename__ = "tipos_trabajo"
+
+    id = db.Column(db.Integer, primary_key=True)
+    clave = db.Column(db.String(40), unique=True, nullable=False)
+    nombre = db.Column(db.String(80), nullable=False)
+    sistema = db.Column(db.String(20), nullable=False)
+    unidad = db.Column(db.String(4), nullable=False)
+    altura_referencia_m = db.Column(db.Numeric(4, 2), nullable=True)
+    modo_dibujo = db.Column(db.String(20), nullable=False)
+    admite_barrotes = db.Column(db.Boolean, default=True)
+    minimo_facturable = db.Column(db.Numeric(5, 2), default=1)
+    activo = db.Column(db.Boolean, default=True)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "clave": self.clave,
+            "nombre": self.nombre,
+            "sistema": self.sistema,
+            "unidad": self.unidad,
+            "altura_referencia_m": float(self.altura_referencia_m) if self.altura_referencia_m is not None else None,
+            "modo_dibujo": self.modo_dibujo,
+            "admite_barrotes": self.admite_barrotes,
+            "minimo_facturable": float(self.minimo_facturable),
+            "activo": self.activo,
+        }
 
 
 class Usuario(db.Model):
@@ -107,6 +140,13 @@ class Cotizacion(db.Model):
     estado = db.Column(db.String(20), default="nueva")
     creado_en = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Especificación unificada de la pieza (ver backend/dominio/spec.py) — de
+    # aquí van a salir el dibujo 2D/3D, el desglose de precio y el despiece,
+    # sin que cada uno tenga su propia idea de qué se está fabricando.
+    # Nullable porque las cotizaciones creadas antes de esta columna no la
+    # tienen — ver backend/migrar_specs.py para el backfill.
+    spec = db.Column(db.JSON, nullable=True)
+
     producto = db.relationship("Producto")
     proyecto = db.relationship("Proyecto", back_populates="cotizacion", uselist=False)
 
@@ -127,6 +167,7 @@ class Cotizacion(db.Model):
             "precio_estimado": float(self.precio_estimado),
             "notas": self.notas,
             "estado": self.estado,
+            "spec": self.spec,
             "tiene_proyecto": self.proyecto is not None,
             "creado_en": self.creado_en.isoformat(),
         }

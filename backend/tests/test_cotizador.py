@@ -10,7 +10,7 @@ import pytest
 
 from extensions import db
 from models import Producto
-from routes.cotizador import calcular_precio
+from dominio.precios import calcular_precio
 
 
 def test_porton_hierro_sin_acabado(app):

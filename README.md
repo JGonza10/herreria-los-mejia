@@ -44,15 +44,50 @@ si faltan. Ver `.env.example`.
   token que esa persona tuviera activo — la única forma barata de revocar
   una sesión sin mantener una lista negra de tokens.
 
+## Especificación unificada de pieza (`backend/dominio/`)
+Una sola estructura de datos (`spec`, guardada como JSON en `Cotizacion.spec`)
+describe qué se va a fabricar, para que el dibujo, el precio y —más
+adelante— la lista de corte lean de la misma fuente en vez de tener cada
+uno su propia idea de qué es una pieza:
+```json
+{
+  "version": 1,
+  "tipo": "porton_corredizo",
+  "sistema": "herreria",
+  "medidas": { "ancho_m": 3.2, "alto_m": 2.4 },
+  "piezas": 1,
+  "estructura": {}, "relleno": {}, "herrajes": [],
+  "acabado": "estandar",
+  "notas": null
+}
+```
+- `dominio/spec.py`: `construir_basico(...)` arma el spec a partir de lo que
+  hoy captura el cotizador (material + medidas); `validar(spec)` lanza
+  `ValueError` si algo no cuadra. El campo `version` existe desde ya —
+  cuando la forma cambie, las cotizaciones viejas necesitan poder seguir
+  leyéndose con la forma que tenían al crearse.
+- `dominio/precios.py`: `calcular_precio()`, la misma función de siempre,
+  reubicada para no depender de Flask.
+- `GET /api/cotizador/tipos-trabajo`: catálogo de qué se puede fabricar
+  (`TipoTrabajo`, tabla `tipos_trabajo`) — en base de datos, no en código,
+  para poder agregar tipos sin redesplegar. Hoy el cotizador no pregunta el
+  tipo todavía, así que cada cotización nueva se guarda como `"indefinido"`.
+- `backend/migrar_specs.py`: backfill de una sola pasada para las
+  cotizaciones creadas antes de que existiera esta columna. Seguro de correr
+  más de una vez — solo toca las filas con `spec` nulo.
+
 ## Estructura
 ```
 herreria-los-mejia/
 ├── backend/
 │   ├── app.py
-│   ├── models.py       # Usuario, Producto, PrecioMaterial, Cotizacion, Proyecto
+│   ├── models.py       # Usuario, Producto, PrecioMaterial, Cotizacion, TipoTrabajo, Proyecto
 │   ├── auth.py          # sesión + decorador @requiere_rol
 │   ├── seed.py
 │   ├── uploads/         # imágenes del catálogo (se crea sola, no subir a git)
+│   ├── dominio/         # motor de precios y spec — sin Flask, sin db.session
+│   │   ├── precios.py    # calcular_precio(): la misma lógica de siempre, reubicada
+│   │   └── spec.py       # especificación unificada de pieza (ver más abajo)
 │   └── routes/
 │       ├── auth.py       # login, registro, logout
 │       ├── admin.py      # catálogo+imágenes, cotizaciones, proyectos, equipo

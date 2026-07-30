@@ -1,8 +1,10 @@
 from flask import Blueprint, jsonify, request
 from extensions import db
-from models import PrecioMaterial, Cotizacion, Producto
+from models import PrecioMaterial, Cotizacion, Producto, TipoTrabajo
 from auth import usuario_actual
 from validacion import numero
+from dominio.precios import calcular_precio
+from dominio.spec import construir_basico
 
 cotizador_bp = Blueprint("cotizador", __name__)
 
@@ -10,29 +12,18 @@ ANCHO_MAXIMO_M = 15
 ALTO_MAXIMO_M = 6
 
 
-def calcular_precio(material: str, ancho_m: float, alto_m: float, con_acabado: bool, producto: Producto = None):
-    """Si se pasa `producto` (modelo elegido del catálogo), se usa su propio
-    precio_referencia_m2 como base — cada modelo puede costar distinto aunque
-    sea del mismo material. Si no, se usa el precio genérico por material
-    (propuesta personalizada, sin modelo específico). El extra por acabado
-    especial siempre sale de la tabla genérica por material."""
-    precio_material = PrecioMaterial.query.filter_by(material=material).first()
-    if precio_material is None:
-        raise ValueError(f"No hay precio configurado para el material '{material}'")
-
-    m2 = round(ancho_m * alto_m, 2)
-    precio_m2 = float(producto.precio_referencia_m2) if producto else float(precio_material.precio_base_m2)
-    if con_acabado:
-        precio_m2 += float(precio_material.precio_acabado_extra_m2)
-
-    total = round(m2 * precio_m2, 2)
-    return m2, total
-
-
 @cotizador_bp.get("/precios")
 def precios_por_material():
     precios = PrecioMaterial.query.all()
     return jsonify([p.to_dict() for p in precios])
+
+
+@cotizador_bp.get("/tipos-trabajo")
+def tipos_trabajo():
+    """Catálogo de qué se puede fabricar (ver dominio/spec.py) — en tabla,
+    no en el frontend, para que el dueño pueda agregar tipos sin redesplegar."""
+    tipos = TipoTrabajo.query.filter_by(activo=True).order_by(TipoTrabajo.nombre.asc()).all()
+    return jsonify([t.to_dict() for t in tipos])
 
 
 @cotizador_bp.post("/calcular")
@@ -81,6 +72,11 @@ def solicitar_cotizacion():
 
     usuario = usuario_actual()
 
+    # "indefinido" porque el catálogo todavía no liga cada producto a un
+    # TipoTrabajo (ver Fase 4) — es el fallback que el propio plan describe,
+    # no un dato inventado.
+    spec = construir_basico(data["material"], ancho_m, alto_m, con_acabado, tipo="indefinido")
+
     cotizacion = Cotizacion(
         cliente_id=usuario.id if usuario else None,
         producto_id=producto_id,
@@ -94,6 +90,7 @@ def solicitar_cotizacion():
         metros_cuadrados=m2,
         precio_estimado=total,
         notas=data.get("notas"),
+        spec=spec,
     )
     db.session.add(cotizacion)
     db.session.commit()
