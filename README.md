@@ -98,6 +98,34 @@ del catálogo/personalizadas todavía no generan PDF, así que no había nada
 que unificar) y el QR a la vista 3D interactiva (depende del link público
 de aceptación de la Fase 7.1, que tampoco existe todavía).
 
+## Tarifas versionadas (`backend/routes/tarifas.py`)
+Antes de esto, la única forma de cambiar un precio era editar `seed.py`,
+hacer commit y redesplegar — la razón número uno por la que un cotizador se
+abandona a los tres meses (actualizar.md, Fase 4.2).
+
+- `POST /api/admin/tarifas` — crea una tarifa nueva (`nombre`, `vigente_desde`).
+- `PUT /api/admin/tarifas/<id>/precios` — reemplaza toda su lista de precios
+  de una sola vez (concepto + clave + unidad + precio).
+- `POST /api/admin/tarifas/<id>/activar` — la marca como la vigente
+  (desactiva cualquier otra).
+- `POST /api/admin/tarifas/<id>/duplicar` — copia una tarifa existente como
+  punto de partida de la siguiente, con un `ajuste_pct` opcional para subir
+  todo de un jalón ("copiar Julio 2026 a Agosto 2026 y subir todo 4 %").
+- Todas las tablas son nuevas (`tarifas`, `precios_tarifa`); nada se borró.
+
+**Pendiente, no incluido en este alcance:** el cotizador (`routes/cotizador.py`)
+todavía lee `PrecioMaterial`, no la tarifa activa — conectarlo depende de
+resolver primero cómo se cobra cada sistema (Fase 4.3: aluminio por perfil +
+cristal, cristal templado con mínimo de fabricación y canteado por
+perímetro), que es un cambio de lógica de negocio real, no solo de dónde
+vive el número. Tampoco se restructuró `Cotizacion` en `Cotizacion` +
+`Partida` (Fase 4.1) — ese cambio toca 3 rutas del backend y 4 páginas del
+frontend (`Cotizador.jsx`, `AdminCotizaciones.jsx`, `AdminPedidos.jsx`,
+`ClientePanel.jsx`) más una migración de datos reales, y el propio plan
+pide confirmar antes con el dueño del taller si el cliente ve un precio
+exacto o un rango (recomendado: rango). Se dejó fuera para no reescribir
+media aplicación sin poder probarla en un navegador real.
+
 ## Estructura
 ```
 herreria-los-mejia/

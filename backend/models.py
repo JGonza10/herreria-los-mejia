@@ -215,3 +215,58 @@ class Proyecto(db.Model):
             "material": self.cotizacion.material,
             "precio_estimado": float(self.cotizacion.precio_estimado),
         }
+
+
+class Tarifa(db.Model):
+    """Un conjunto completo de precios con fecha de vigencia. Nunca se
+    edita: se crea una nueva versión. Solo puede haber una `activa` a la vez
+    (ver routes/admin.py, activar_tarifa) — las cotizaciones futuras usan la
+    activa; las viejas conservan la que usaron cuando se crearon."""
+    __tablename__ = "tarifas"
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(60), nullable=False)
+    vigente_desde = db.Column(db.Date, nullable=False)
+    activa = db.Column(db.Boolean, default=False)
+    creada_por_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=True)
+    creada_en = db.Column(db.DateTime, default=datetime.utcnow)
+
+    precios = db.relationship("PrecioTarifa", cascade="all, delete-orphan", backref="tarifa")
+
+    def to_dict(self, con_precios=False):
+        datos = {
+            "id": self.id,
+            "nombre": self.nombre,
+            "vigente_desde": self.vigente_desde.isoformat(),
+            "activa": self.activa,
+            "creada_en": self.creada_en.isoformat(),
+        }
+        if con_precios:
+            datos["precios"] = [p.to_dict() for p in self.precios]
+        return datos
+
+
+class PrecioTarifa(db.Model):
+    __tablename__ = "precios_tarifa"
+    __table_args__ = (
+        db.Index("ix_precios_tarifa_tarifa_id", "tarifa_id"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    tarifa_id = db.Column(db.Integer, db.ForeignKey("tarifas.id"), nullable=False)
+    tipo_trabajo_id = db.Column(db.Integer, db.ForeignKey("tipos_trabajo.id"), nullable=True)
+    concepto = db.Column(db.String(40), nullable=False)   # material_base, acabado, perfil, cristal, herraje, mano_obra...
+    clave = db.Column(db.String(40), nullable=False)      # hierro, aluminio, ptr_1.5_cal14, templado_6mm...
+    unidad = db.Column(db.String(6), nullable=False)      # m2, ml, pza, %
+    precio = db.Column(db.Numeric(10, 2), nullable=False)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "tarifa_id": self.tarifa_id,
+            "tipo_trabajo_id": self.tipo_trabajo_id,
+            "concepto": self.concepto,
+            "clave": self.clave,
+            "unidad": self.unidad,
+            "precio": float(self.precio),
+        }

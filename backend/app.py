@@ -14,6 +14,7 @@ from routes.admin import admin_bp
 from routes.trabajador import trabajador_bp
 from routes.cliente import cliente_bp
 from routes.escalera import escalera_bp
+from routes.tarifas import tarifas_bp
 
 
 def _configurar_logging():
@@ -79,6 +80,7 @@ def create_app():
     app.register_blueprint(trabajador_bp, url_prefix="/api/trabajador")
     app.register_blueprint(cliente_bp, url_prefix="/api/cliente")
     app.register_blueprint(escalera_bp, url_prefix="/api/escalera")
+    app.register_blueprint(tarifas_bp, url_prefix="/api/admin/tarifas")
 
     @app.after_request
     def log_peticion(response):
