@@ -1,6 +1,7 @@
 import os
-from flask import Flask, send_from_directory
+from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
+from werkzeug.exceptions import HTTPException
 
 from extensions import db, limiter, migrate
 from routes.catalogo import catalogo_bp
@@ -68,6 +69,17 @@ def create_app():
     @app.get("/uploads/<path:nombre_archivo>")
     def servir_imagen(nombre_archivo):
         return send_from_directory(app.config["UPLOAD_FOLDER"], nombre_archivo)
+
+    @app.errorhandler(ValueError)
+    def manejar_valor_invalido(error):
+        return jsonify({"error": str(error)}), 400
+
+    @app.errorhandler(Exception)
+    def manejar_error_generico(error):
+        if isinstance(error, HTTPException):
+            return error
+        app.logger.exception("Error no manejado")
+        return jsonify({"error": "Ocurrió un error interno. Intenta de nuevo más tarde."}), 500
 
     return app
 

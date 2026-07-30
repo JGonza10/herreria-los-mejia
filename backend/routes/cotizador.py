@@ -2,8 +2,12 @@ from flask import Blueprint, jsonify, request
 from extensions import db
 from models import PrecioMaterial, Cotizacion, Producto
 from auth import usuario_actual
+from validacion import numero
 
 cotizador_bp = Blueprint("cotizador", __name__)
+
+ANCHO_MAXIMO_M = 15
+ALTO_MAXIMO_M = 6
 
 
 def calcular_precio(material: str, ancho_m: float, alto_m: float, con_acabado: bool, producto: Producto = None):
@@ -34,13 +38,13 @@ def precios_por_material():
 @cotizador_bp.post("/calcular")
 def calcular():
     data = request.get_json(force=True)
-    try:
-        material = data["material"]
-        ancho_m = float(data["ancho_m"])
-        alto_m = float(data["alto_m"])
-        con_acabado = bool(data.get("con_acabado", False))
-    except (KeyError, TypeError, ValueError):
-        return jsonify({"error": "Datos inválidos. Se requiere material, ancho_m y alto_m."}), 400
+    material = data.get("material")
+    if not material:
+        return jsonify({"error": "Falta 'material'."}), 400
+
+    ancho_m = numero(data.get("ancho_m"), "ancho_m", minimo=0.1, maximo=ANCHO_MAXIMO_M)
+    alto_m = numero(data.get("alto_m"), "alto_m", minimo=0.1, maximo=ALTO_MAXIMO_M)
+    con_acabado = bool(data.get("con_acabado", False))
 
     producto = None
     producto_id = data.get("producto_id")
@@ -49,11 +53,7 @@ def calcular():
         if not producto:
             return jsonify({"error": "El producto seleccionado no existe."}), 400
 
-    try:
-        m2, total = calcular_precio(material, ancho_m, alto_m, con_acabado, producto)
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-
+    m2, total = calcular_precio(material, ancho_m, alto_m, con_acabado, producto)
     return jsonify({"metros_cuadrados": m2, "precio_estimado": total})
 
 
@@ -74,13 +74,10 @@ def solicitar_cotizacion():
     if producto_id and not producto:
         return jsonify({"error": "El producto seleccionado no existe."}), 400
 
-    try:
-        ancho_m = float(data["ancho_m"])
-        alto_m = float(data["alto_m"])
-        con_acabado = bool(data.get("con_acabado", False))
-        m2, total = calcular_precio(data["material"], ancho_m, alto_m, con_acabado, producto)
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+    ancho_m = numero(data["ancho_m"], "ancho_m", minimo=0.1, maximo=ANCHO_MAXIMO_M)
+    alto_m = numero(data["alto_m"], "alto_m", minimo=0.1, maximo=ALTO_MAXIMO_M)
+    con_acabado = bool(data.get("con_acabado", False))
+    m2, total = calcular_precio(data["material"], ancho_m, alto_m, con_acabado, producto)
 
     usuario = usuario_actual()
 

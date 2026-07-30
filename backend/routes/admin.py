@@ -5,6 +5,7 @@ from werkzeug.utils import secure_filename
 from extensions import db
 from models import Producto, Cotizacion, Proyecto, Usuario, ESTADOS_PROYECTO
 from auth import requiere_rol
+from validacion import numero
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -41,7 +42,7 @@ def crear_producto():
         nombre=nombre,
         material=material,
         descripcion=descripcion,
-        precio_referencia_m2=float(precio),
+        precio_referencia_m2=numero(precio, "precio_referencia_m2", minimo=0.01),
         destacado=destacado,
     )
 
@@ -63,7 +64,7 @@ def actualizar_producto(producto_id):
     producto.material = request.form.get("material", producto.material)
     producto.descripcion = request.form.get("descripcion", producto.descripcion)
     if request.form.get("precio_referencia_m2"):
-        producto.precio_referencia_m2 = float(request.form["precio_referencia_m2"])
+        producto.precio_referencia_m2 = numero(request.form["precio_referencia_m2"], "precio_referencia_m2", minimo=0.01)
     if "destacado" in request.form:
         producto.destacado = request.form.get("destacado") == "true"
     if "activo" in request.form:
