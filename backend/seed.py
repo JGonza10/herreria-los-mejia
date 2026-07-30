@@ -2,15 +2,31 @@
 Llena la base de datos con precios base, catálogo de ejemplo y usuarios de
 prueba (uno por cada rol). Ejecutar una sola vez: python seed.py
 
-IMPORTANTE: cambia las contraseñas de ejemplo antes de usar el sitio con
-clientes reales — puedes hacerlo desde el panel de administrador o
-directamente en la base de datos.
+Las contraseñas de los usuarios de prueba se toman de variables de entorno
+(SEED_ADMIN_PASSWORD, SEED_TRABAJADOR_PASSWORD, SEED_CLIENTE_PASSWORD) — el
+script no corre si faltan, para que nunca queden contraseñas fijas en el
+código ni en el repositorio.
 """
+import os
+import sys
+
 from app import create_app
 from extensions import db
 from models import PrecioMaterial, Producto, Usuario
 
 app = create_app()
+
+
+def password_requerido(nombre_var):
+    valor = os.environ.get(nombre_var)
+    if not valor or len(valor) < 12:
+        sys.exit(f"Falta {nombre_var} (mínimo 12 caracteres). El seed no corre sin ella.")
+    return valor
+
+
+PASSWORD_ADMIN = password_requerido("SEED_ADMIN_PASSWORD")
+PASSWORD_TRABAJADOR = password_requerido("SEED_TRABAJADOR_PASSWORD")
+PASSWORD_CLIENTE = password_requerido("SEED_CLIENTE_PASSWORD")
 
 PRECIOS = [
     {"material": "hierro", "precio_base_m2": 1200, "precio_acabado_extra_m2": 250},
@@ -79,9 +95,9 @@ with app.app_context():
             db.session.add(Producto(**prod))
 
     USUARIOS_EJEMPLO = [
-        {"nombre": "Admin Los Mejía", "email": "admin@losmejia.com", "password": "cambiar123", "rol": "administrador"},
-        {"nombre": "Trabajador Ejemplo", "email": "trabajador@losmejia.com", "password": "cambiar123", "rol": "trabajador"},
-        {"nombre": "Cliente Ejemplo", "email": "cliente@losmejia.com", "password": "cambiar123", "rol": "cliente"},
+        {"nombre": "Admin Los Mejía", "email": "admin@losmejia.com", "password": PASSWORD_ADMIN, "rol": "administrador"},
+        {"nombre": "Trabajador Ejemplo", "email": "trabajador@losmejia.com", "password": PASSWORD_TRABAJADOR, "rol": "trabajador"},
+        {"nombre": "Cliente Ejemplo", "email": "cliente@losmejia.com", "password": PASSWORD_CLIENTE, "rol": "cliente"},
     ]
     for datos in USUARIOS_EJEMPLO:
         if not Usuario.query.filter_by(email=datos["email"]).first():
@@ -91,6 +107,6 @@ with app.app_context():
 
     db.session.commit()
     print("Datos de ejemplo cargados correctamente.")
-    print("Usuarios de prueba (cambia las contraseñas antes de producción):")
+    print("Usuarios de prueba (contraseñas tomadas de las variables de entorno, no se imprimen):")
     for datos in USUARIOS_EJEMPLO:
-        print(f"  {datos['rol']}: {datos['email']} / {datos['password']}")
+        print(f"  {datos['rol']}: {datos['email']}")

@@ -2,7 +2,7 @@ import os
 from flask import Flask, send_from_directory
 from flask_cors import CORS
 
-from extensions import db
+from extensions import db, limiter
 from routes.catalogo import catalogo_bp
 from routes.cotizador import cotizador_bp
 from routes.chatbot import chatbot_bp
@@ -30,8 +30,14 @@ def create_app():
 
     # SECRET_KEY firma los tokens de autenticación (ver auth.py). Debe
     # fijarse en producción vía variable de entorno para que los tokens no
-    # se invaliden en cada deploy.
-    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "clave-de-desarrollo-cambiar-en-produccion")
+    # se invaliden en cada deploy. Si falta en Railway, la app no arranca:
+    # una firma débil no se nota nunca, un servicio caído se nota en minutos.
+    secret_key = os.environ.get("SECRET_KEY")
+    if not secret_key:
+        if os.environ.get("RAILWAY_ENVIRONMENT"):
+            raise RuntimeError("SECRET_KEY no está definida. La app no arranca sin ella.")
+        secret_key = "solo-desarrollo-local"
+    app.config["SECRET_KEY"] = secret_key
 
     # Carpeta donde se guardan las imágenes del catálogo.
     # NOTA: el disco de Railway es efímero salvo que agregues un Volume
@@ -40,6 +46,7 @@ def create_app():
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
     db.init_app(app)
+    limiter.init_app(app)
 
     frontend_origin = os.environ.get("FRONTEND_ORIGIN", "*")
     CORS(app, resources={r"/api/*": {"origins": frontend_origin}}, supports_credentials=True)

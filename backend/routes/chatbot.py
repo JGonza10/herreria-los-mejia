@@ -2,11 +2,17 @@ import os
 import requests
 from flask import Blueprint, jsonify, request
 
+from extensions import limiter
+
 chatbot_bp = Blueprint("chatbot", __name__)
 
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_VERSION = "2023-06-01"
 MODEL = "claude-sonnet-4-6"
+
+MAX_MENSAJES_HISTORIAL = 10
+MAX_CARACTERES_MENSAJE = 2000
+ROLES_VALIDOS = {"user", "assistant"}
 
 SYSTEM_PROMPT = """Eres el asistente virtual de Herrería "Los Mejía", un taller que
 trabaja hierro, aluminio y vidrio (portones, rejas, barandales, ventanas,
@@ -23,6 +29,7 @@ cancelería y trabajos a medida). Tu trabajo es:
 
 
 @chatbot_bp.post("/mensaje")
+@limiter.limit("20 per hour;100 per day")
 def enviar_mensaje():
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
@@ -35,6 +42,18 @@ def enviar_mensaje():
     historial = data.get("historial", [])  # [{role: "user"|"assistant", content: "..."}]
     if not historial:
         return jsonify({"error": "Falta 'historial' con al menos un mensaje."}), 400
+
+    if not isinstance(historial, list):
+        return jsonify({"error": "'historial' debe ser una lista de mensajes."}), 400
+
+    for mensaje in historial:
+        if not isinstance(mensaje, dict) or mensaje.get("role") not in ROLES_VALIDOS:
+            return jsonify({"error": "Cada mensaje debe tener 'role' en {'user', 'assistant'}."}), 400
+        contenido = mensaje.get("content", "")
+        if not isinstance(contenido, str) or len(contenido) > MAX_CARACTERES_MENSAJE:
+            return jsonify({"error": f"'content' debe ser texto de máximo {MAX_CARACTERES_MENSAJE} caracteres."}), 400
+
+    historial = historial[-MAX_MENSAJES_HISTORIAL:]
 
     try:
         respuesta = requests.post(

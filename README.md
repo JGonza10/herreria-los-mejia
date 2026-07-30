@@ -17,12 +17,16 @@ con IA, y un sistema de 3 roles (administrador, trabajador, cliente).
 | **Trabajador** | Ver los proyectos que le asignó el administrador, actualizar su estado y % de avance, ver la cola general pendiente (solo lectura) |
 | **Administrador** | Cargar/editar/eliminar productos del catálogo (con imagen), revisar y aprobar/rechazar cotizaciones (asignando trabajador al aprobar), dashboard de todos los pedidos, crear cuentas de trabajador |
 
-**Usuarios de prueba** (creados por `seed.py`, cambia las contraseñas antes de producción):
+**Usuarios de prueba** (creados por `seed.py`):
 ```
-administrador: admin@losmejia.com / cambiar123
-trabajador:    trabajador@losmejia.com / cambiar123
-cliente:       cliente@losmejia.com / cambiar123
+administrador: admin@losmejia.com
+trabajador:    trabajador@losmejia.com
+cliente:       cliente@losmejia.com
 ```
+Las contraseñas no viven en este repositorio: `seed.py` las toma de las
+variables de entorno `SEED_ADMIN_PASSWORD`, `SEED_TRABAJADOR_PASSWORD` y
+`SEED_CLIENTE_PASSWORD` (mínimo 12 caracteres cada una) y se niega a correr
+si faltan. Ver `.env.example`.
 
 ## Estructura
 ```
@@ -59,8 +63,9 @@ pip install -r requirements.txt
 
 cp .env.example .env
 # Edita .env: DATABASE_URL (o deja sqlite:///local.db para probar sin
-# Postgres), ANTHROPIC_API_KEY para el chatbot, y SECRET_KEY (cualquier
-# cadena larga y aleatoria).
+# Postgres), ANTHROPIC_API_KEY para el chatbot, SECRET_KEY (cualquier
+# cadena larga y aleatoria), y SEED_ADMIN_PASSWORD / SEED_TRABAJADOR_PASSWORD
+# / SEED_CLIENTE_PASSWORD (mínimo 12 caracteres) para los usuarios de prueba.
 
 python seed.py                # carga catálogo, precios y usuarios de prueba
 python app.py                 # levanta en http://localhost:5000
@@ -99,10 +104,18 @@ subir las imágenes si el servicio se redespliega.
    `FRONTEND_ORIGIN` = la URL pública de tu servicio frontend (con `https://`,
    sin `/` al final) — **necesaria para que las cookies de sesión funcionen
    entre dominios distintos**.
+   El endpoint del chatbot ya limita peticiones por IP (20/hora, 100/día) y
+   trunca el historial, pero eso no reemplaza poner un **límite de gasto
+   mensual** para `ANTHROPIC_API_KEY` en console.anthropic.com — es la única
+   protección que no depende de que el código esté bien.
 3. Agrega PostgreSQL (**+ New → Database → PostgreSQL**), Railway conecta
    `DATABASE_URL` solo.
 4. Genera el dominio público (**Settings → Networking → Generate Domain**).
-5. Shell del servicio → `python seed.py` (una sola vez).
+5. Antes de correr el seed, agrega `SEED_ADMIN_PASSWORD`,
+   `SEED_TRABAJADOR_PASSWORD` y `SEED_CLIENTE_PASSWORD` (mínimo 12
+   caracteres, distintas entre sí) como variables del servicio — luego
+   Shell del servicio → `python seed.py` (una sola vez). Puedes borrar esas
+   tres variables después de correrlo.
 6. (Opcional pero recomendado) configura el Volume de la sección 3.
 
 ### Frontend
