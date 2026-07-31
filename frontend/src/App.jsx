@@ -10,6 +10,7 @@ import Registro from "./pages/Registro.jsx";
 import AdminPanel from "./pages/admin/AdminPanel.jsx";
 import TrabajadorPanel from "./pages/TrabajadorPanel.jsx";
 import ClientePanel from "./pages/ClientePanel.jsx";
+import CotizacionPublica from "./pages/CotizacionPublica.jsx";
 
 export default function App() {
   return (
@@ -75,6 +76,7 @@ function Rutas() {
           </RutaProtegida>
         }
       />
+      <Route path="/cotizacion/:token" element={<CotizacionPublica />} />
     </Routes>
   );
 }

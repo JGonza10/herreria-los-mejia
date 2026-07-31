@@ -112,6 +112,9 @@ abandona a los tres meses (actualizar.md, Fase 4.2).
   punto de partida de la siguiente, con un `ajuste_pct` opcional para subir
   todo de un jalón ("copiar Julio 2026 a Agosto 2026 y subir todo 4 %").
 - Todas las tablas son nuevas (`tarifas`, `precios_tarifa`); nada se borró.
+- **Pantalla:** pestaña "Tarifas" del panel de administrador
+  (`AdminTarifas.jsx`) — crear, editar precios en tabla, activar y duplicar
+  con ajuste porcentual, todo desde el navegador.
 
 ## Partidas múltiples y cobro por sistema (Fase 4.1/4.3/4.4)
 `POST /api/cotizador/solicitar` acepta ahora un cuerpo con `piezas` (lista) en
@@ -147,14 +150,16 @@ con_acabado, piezas, descripcion}`. Con eso:
   sobre costo es 20% sobre venta) y el estimado del cliente como **rango**
   (±10%), nunca como número exacto.
 
-**Pendiente, no incluido en este alcance:** no hay pantalla de frontend para
-capturar varias piezas en una sola solicitud, ni para correr la simulación
-— ambos endpoints existen y están probados, pero se consumen hoy solo por
-API. Construir esas pantallas (`Cotizador.jsx` con varias piezas,
-`AdminCotizaciones.jsx` con el panel de simulación) requiere probarlas en un
-navegador real, que no está disponible en este entorno, y el plan pide
-confirmar antes con el dueño del taller si el cliente ve un precio exacto o
-un rango (recomendado: rango) antes de exponerlo en una pantalla pública.
+**Actualización:** ya existe la pantalla. `Cotizador.jsx` deja agregar
+piezas adicionales ("+ Agregar otra pieza") — sin piezas extra, manda la
+solicitud exactamente igual que siempre (`/solicitar` sin `piezas`); con una
+o más, arma el arreglo `piezas` y usa el motor nuevo. El estimado se
+muestra siempre como **rango ±10%**, nunca como número exacto (siguiendo la
+recomendación del plan). `AdminCotizaciones.jsx` tiene el panel de
+simulación por cotización (no guarda nada hasta que el admin confirme por
+otro lado). Validado con `vite build` y con una petición real de extremo a
+extremo contra el backend (ver commit correspondiente) — no se probó en un
+navegador real, este entorno no tiene uno disponible.
 
 ## Lista de corte y requisición de material (Fase 5)
 `backend/dominio/despiece.py` saca de la especificación de una partida
@@ -184,6 +189,10 @@ hace falta un solver.
 - Si no se capturó `separacion_barrotes_cm`, usa 12 cm por defecto (el
   mismo valor del ejemplo de la Fase 2) — es un despiece de referencia, no
   el definitivo del taller, hasta que el formulario capture esos datos.
+- **Ya tiene pantalla:** dentro del detalle de cada proyecto en
+  `AdminPedidos.jsx`, por partida — botones "Ver lista de corte" y
+  "Descargar orden de trabajo (PDF)". `AdminRequisicion.jsx` es la pestaña
+  nueva del panel para el total agregado.
 
 ## 3D paramétrico para el resto del catálogo (Fase 6)
 `Escalera3D.jsx` (three.js puro) demostró que la capacidad ya estaba en el
@@ -268,11 +277,14 @@ proyecto (desde admin y desde trabajador). `GET /api/admin/bitacora`
 (filtrable por `entidad`/`entidad_id`) responde "¿quién le bajó el precio a
 esta cotización?".
 
-**Pendiente, no incluido en este alcance:** las pantallas de frontend para
-todo lo anterior (botón de aceptar en una página pública, formulario de
-registrar pago, galería de fotos, tablero de seguimiento, calendario de
-agenda, vista de la bitácora) — los ocho endpoints están hechos y probados,
-pero se consumen hoy solo por API.
+**Actualización:** ya existen las pantallas — página pública en
+`/cotizacion/:token` (`CotizacionPublica.jsx`) con el botón de aceptar;
+formulario de registrar pago y galería de fotos dentro del detalle de cada
+proyecto en `AdminPedidos.jsx`; tablero de seguimiento y botón de WhatsApp
+en `AdminCotizaciones.jsx`; `AdminAgenda.jsx` y `AdminBitacora.jsx` como
+pestañas nuevas del panel. El trabajador sube sus propias fotos y registra
+horas desde `TrabajadorPanel.jsx`; el cliente ve sus fotos de avance y su
+saldo desde `ClientePanel.jsx`.
 
 ## Los números del negocio (Fase 8)
 Todo lo anterior recopila datos; esta fase los usa (`backend/reportes.py`).
@@ -296,9 +308,11 @@ Todo lo anterior recopila datos; esta fase los usa (`backend/reportes.py`).
   ya estaba instalado): un libro con las 4 hojas de arriba, para el
   contador.
 
-**Pendiente, no incluido en este alcance:** pantallas de frontend (el
-trabajador registra horas hoy solo por API; el administrador captura el
-costo real igual). Con esto se cierran las 8 fases de `actualizar.md`.
+**Actualización:** ya existen las pantallas. El trabajador registra horas
+desde `TrabajadorPanel.jsx`; el administrador captura el costo real y ve
+las 4 tablas de reportes (con el botón de exportar a Excel) desde
+`AdminPedidos.jsx` y la pestaña nueva `AdminReportes.jsx`. Con esto se
+cierran las 8 fases de `actualizar.md` — backend y frontend.
 
 ## Estructura
 ```

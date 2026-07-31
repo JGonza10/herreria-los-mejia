@@ -4,6 +4,11 @@ import AdminCatalogo from "./AdminCatalogo.jsx";
 import AdminCotizaciones from "./AdminCotizaciones.jsx";
 import AdminPedidos from "./AdminPedidos.jsx";
 import AdminUsuarios from "./AdminUsuarios.jsx";
+import AdminTarifas from "./AdminTarifas.jsx";
+import AdminRequisicion from "./AdminRequisicion.jsx";
+import AdminAgenda from "./AdminAgenda.jsx";
+import AdminBitacora from "./AdminBitacora.jsx";
+import AdminReportes from "./AdminReportes.jsx";
 
 // Carga perezosa: AdminEscalera trae Three.js (~600 KB). Si fuera un import
 // normal, ese peso se sumaría al bundle principal del sitio público entero.
@@ -14,6 +19,11 @@ const TABS = [
   { id: "pedidos", etiqueta: "Pedidos", Componente: AdminPedidos },
   { id: "cotizaciones", etiqueta: "Cotizaciones", Componente: AdminCotizaciones },
   { id: "catalogo", etiqueta: "Catálogo", Componente: AdminCatalogo },
+  { id: "tarifas", etiqueta: "Tarifas", Componente: AdminTarifas },
+  { id: "requisicion", etiqueta: "Requisición", Componente: AdminRequisicion },
+  { id: "agenda", etiqueta: "Agenda", Componente: AdminAgenda },
+  { id: "reportes", etiqueta: "Reportes", Componente: AdminReportes },
+  { id: "bitacora", etiqueta: "Bitácora", Componente: AdminBitacora },
   { id: "equipo", etiqueta: "Equipo", Componente: AdminUsuarios },
   { id: "escalera", etiqueta: "Escalera", Componente: AdminEscalera },
 ];

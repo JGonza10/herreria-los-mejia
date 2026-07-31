@@ -26,4 +26,4 @@ def mis_proyectos():
         .order_by(Proyecto.creado_en.desc())
         .all()
     )
-    return jsonify([p.to_dict() for p in proyectos])
+    return jsonify([p.to_dict(vista="cliente") for p in proyectos])

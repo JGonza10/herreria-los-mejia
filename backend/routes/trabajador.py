@@ -18,7 +18,7 @@ def mis_proyectos():
         .order_by(Proyecto.creado_en.desc())
         .all()
     )
-    return jsonify([p.to_dict() for p in proyectos])
+    return jsonify([p.to_dict(vista="trabajador") for p in proyectos])
 
 
 @trabajador_bp.get("/proyectos/pendientes")
@@ -30,7 +30,7 @@ def proyectos_pendientes_sin_asignar():
         .order_by(Proyecto.creado_en.asc())
         .all()
     )
-    return jsonify([p.to_dict() for p in proyectos])
+    return jsonify([p.to_dict(vista="trabajador") for p in proyectos])
 
 
 @trabajador_bp.put("/proyectos/<int:proyecto_id>/avance")
@@ -56,7 +56,7 @@ def actualizar_avance(proyecto_id):
         proyecto.notas_internas = data["notas_internas"]
 
     db.session.commit()
-    return jsonify(proyecto.to_dict())
+    return jsonify(proyecto.to_dict(vista="trabajador"))
 
 
 @trabajador_bp.post("/proyectos/<int:proyecto_id>/fotos")

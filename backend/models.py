@@ -280,9 +280,12 @@ class Proyecto(db.Model):
     def total_horas(self):
         return sum((float(r.horas) for r in self.registros_horas), 0.0)
 
-    def to_dict(self):
-        precio_total = float(self.cotizacion.total) if self.cotizacion.total is not None else float(self.cotizacion.precio_estimado)
-        return {
+    def to_dict(self, vista="admin"):
+        """vista controla qué tanto se expone según quién pregunta — el
+        trabajador y el cliente no deben ver costo_material_real ni el
+        historial de pagos con detalle interno (registrado_por_id, etc.),
+        aunque sí les sirve ver su propio saldo o sus propias horas."""
+        datos = {
             "id": self.id,
             "cotizacion_id": self.cotizacion_id,
             "cliente_id": self.cliente_id,
@@ -298,14 +301,24 @@ class Proyecto(db.Model):
             "actualizado_en": self.actualizado_en.isoformat(),
             "material": self.cotizacion.material,
             "precio_estimado": float(self.cotizacion.precio_estimado),
-            "total_pagado": round(self.total_pagado, 2),
-            "saldo": round(precio_total - self.total_pagado, 2),
-            "pagos": [p.to_dict() for p in self.pagos],
             "fotos": [f.to_dict() for f in self.fotos],
-            "costo_material_real": float(self.costo_material_real) if self.costo_material_real is not None else None,
-            "total_horas": round(self.total_horas, 2),
-            "registros_horas": [r.to_dict() for r in self.registros_horas],
         }
+
+        if vista in ("admin", "cliente"):
+            precio_total = float(self.cotizacion.total) if self.cotizacion.total is not None else float(self.cotizacion.precio_estimado)
+            datos["total_pagado"] = round(self.total_pagado, 2)
+            datos["saldo"] = round(precio_total - self.total_pagado, 2)
+
+        if vista in ("admin", "trabajador"):
+            datos["total_horas"] = round(self.total_horas, 2)
+            datos["registros_horas"] = [r.to_dict() for r in self.registros_horas]
+
+        if vista == "admin":
+            datos["partidas"] = [p.to_dict() for p in self.cotizacion.partidas]
+            datos["pagos"] = [p.to_dict() for p in self.pagos]
+            datos["costo_material_real"] = float(self.costo_material_real) if self.costo_material_real is not None else None
+
+        return datos
 
 
 class Tarifa(db.Model):

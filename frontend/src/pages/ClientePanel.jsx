@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import LayoutPanel from "../components/LayoutPanel.jsx";
 import { api } from "../api.js";
+import { urlImagen } from "../config.js";
 
 const ETIQUETA_COTIZACION = {
   nueva: "En revisión",
@@ -20,6 +21,7 @@ const ETIQUETA_PROYECTO = {
 export default function ClientePanel() {
   const [cotizaciones, setCotizaciones] = useState([]);
   const [proyectos, setProyectos] = useState([]);
+  const [expandido, setExpandido] = useState(null);
 
   useEffect(() => {
     api.get("/api/cliente/cotizaciones").then(setCotizaciones).catch(() => {});
@@ -44,10 +46,35 @@ export default function ClientePanel() {
               {p.material} · ${p.precio_estimado.toLocaleString("es-MX")}
               {p.trabajador_nombre && ` · A cargo de ${p.trabajador_nombre}`}
             </p>
+            {typeof p.saldo === "number" && (
+              <p style={{ fontSize: "0.85rem", marginTop: 4, color: p.saldo > 0 ? "var(--ascua-400)" : "#4caf6d" }}>
+                {p.saldo > 0 ? `Saldo pendiente: $${p.saldo.toLocaleString("es-MX")}` : "Pagado completo"}
+              </p>
+            )}
             <div style={{ marginTop: 12, height: 6, background: "var(--fondo-sutil)", borderRadius: 999, overflow: "hidden" }}>
               <div style={{ width: `${p.avance_porcentaje}%`, height: "100%", background: "var(--ascua-500)" }} />
             </div>
             <p style={{ fontSize: "0.78rem", color: "var(--texto-tenue)", marginTop: 4 }}>{p.avance_porcentaje}% completado</p>
+
+            {p.fotos && p.fotos.length > 0 && (
+              <>
+                <button
+                  onClick={() => setExpandido(expandido === p.id ? null : p.id)}
+                  style={{ background: "none", border: "none", color: "var(--ascua-400)", cursor: "pointer", fontSize: "0.8rem", padding: 0, marginTop: 10 }}
+                >
+                  {expandido === p.id ? "Ocultar fotos" : `Ver fotos de avance (${p.fotos.length})`}
+                </button>
+                {expandido === p.id && (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                    {p.fotos.map((foto) => (
+                      <a key={foto.id} href={urlImagen(foto.url)} target="_blank" rel="noreferrer">
+                        <img src={urlImagen(foto.url)} alt="avance" style={{ width: 100, height: 100, objectFit: "cover", borderRadius: "var(--radius-sm)", border: "1px solid var(--borde)" }} />
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         ))}
         {proyectos.length === 0 && <p style={{ color: "var(--texto-tenue)" }}>Todavía no tienes proyectos aprobados.</p>}

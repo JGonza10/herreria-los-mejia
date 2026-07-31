@@ -30,6 +30,24 @@ export default function Cotizador({ productoPreseleccionado }) {
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState(null);
+  const [resultadoEnvio, setResultadoEnvio] = useState(null);
+
+  // Piezas adicionales (Fase 4.1): la primera pieza sigue usando los campos
+  // de arriba (material/ancho/alto/conAcabado) sin tocarlos, para no romper
+  // el camino de una sola pieza que ya funcionaba. Solo si se agrega una
+  // pieza más, la solicitud se manda como 'piezas' (varias partidas) en vez
+  // del formato de siempre.
+  const [piezasExtra, setPiezasExtra] = useState([]);
+
+  const agregarPieza = () => {
+    setPiezasExtra([...piezasExtra, { material: "hierro", ancho: 1, alto: 1, conAcabado: false, piezas: 1 }]);
+  };
+  const cambiarPieza = (i, campo, valor) => {
+    const copia = [...piezasExtra];
+    copia[i] = { ...copia[i], [campo]: valor };
+    setPiezasExtra(copia);
+  };
+  const quitarPieza = (i) => setPiezasExtra(piezasExtra.filter((_, idx) => idx !== i));
 
   useEffect(() => {
     api.get("/api/catalogo").then(setProductos).catch(() => setProductos([]));
@@ -49,6 +67,13 @@ export default function Cotizador({ productoPreseleccionado }) {
       if (producto) setMaterial(producto.material);
     }
   }, [modo, productoId, productos]);
+
+  // "Modelo del catálogo" es una sola pieza — si el cliente había agregado
+  // piezas adicionales en modo "personalizada" y luego cambia de pestaña,
+  // no tiene sentido mezclarlas con un modelo específico.
+  useEffect(() => {
+    if (modo === "modelo") setPiezasExtra([]);
+  }, [modo]);
 
   useEffect(() => {
     const anchoNum = Number(ancho);
@@ -79,16 +104,30 @@ export default function Cotizador({ productoPreseleccionado }) {
     setEnviando(true);
     setErrorEnvio(null);
     try {
-      await api.post("/api/cotizador/solicitar", {
-        nombre_cliente: nombre,
-        telefono,
-        email,
-        material,
-        ancho_m: Number(ancho),
-        alto_m: Number(alto),
-        con_acabado: conAcabado,
-        producto_id: modo === "modelo" && productoId ? Number(productoId) : null,
-      });
+      let respuesta;
+      if (piezasExtra.length === 0) {
+        // Sin piezas adicionales: exactamente el mismo camino de siempre.
+        respuesta = await api.post("/api/cotizador/solicitar", {
+          nombre_cliente: nombre,
+          telefono,
+          email,
+          material,
+          ancho_m: Number(ancho),
+          alto_m: Number(alto),
+          con_acabado: conAcabado,
+          producto_id: modo === "modelo" && productoId ? Number(productoId) : null,
+        });
+      } else {
+        const piezas = [
+          { material, ancho_m: Number(ancho), alto_m: Number(alto), con_acabado: conAcabado, piezas: 1 },
+          ...piezasExtra.map((p) => ({
+            material: p.material, ancho_m: Number(p.ancho), alto_m: Number(p.alto),
+            con_acabado: p.conAcabado, piezas: Number(p.piezas) || 1,
+          })),
+        ];
+        respuesta = await api.post("/api/cotizador/solicitar", { nombre_cliente: nombre, telefono, email, piezas });
+      }
+      setResultadoEnvio(respuesta);
       setEnviado(true);
     } catch (err) {
       setErrorEnvio(err.message);
@@ -186,6 +225,25 @@ export default function Cotizador({ productoPreseleccionado }) {
               <input type="checkbox" checked={conAcabado} onChange={(e) => setConAcabado(e.target.checked)} />
               Acabado especial (pintura electrostática / esmerilado)
             </label>
+
+            {modo === "personalizada" && (
+              <div>
+                {piezasExtra.map((p, i) => (
+                  <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8, padding: 10, background: "var(--fondo-sutil)", borderRadius: "var(--radius-sm)" }}>
+                    <select value={p.material} onChange={(e) => cambiarPieza(i, "material", e.target.value)} style={{ ...inputEstilo, width: "auto" }}>
+                      {MATERIALES.map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                    <input type="number" min="0.1" step="0.1" placeholder="Ancho" value={p.ancho} onChange={(e) => cambiarPieza(i, "ancho", e.target.value)} style={{ ...inputEstilo, width: 80 }} />
+                    <input type="number" min="0.1" step="0.1" placeholder="Alto" value={p.alto} onChange={(e) => cambiarPieza(i, "alto", e.target.value)} style={{ ...inputEstilo, width: 80 }} />
+                    <input type="number" min="1" placeholder="Piezas" value={p.piezas} onChange={(e) => cambiarPieza(i, "piezas", e.target.value)} style={{ ...inputEstilo, width: 70 }} />
+                    <button type="button" onClick={() => quitarPieza(i)} style={{ background: "none", border: "none", color: "var(--ascua-400)", cursor: "pointer" }}>Quitar</button>
+                  </div>
+                ))}
+                <button type="button" onClick={agregarPieza} className="boton boton-borde" style={{ fontSize: "0.82rem" }}>
+                  + Agregar otra pieza
+                </button>
+              </div>
+            )}
           </div>
 
           <div
@@ -198,15 +256,25 @@ export default function Cotizador({ productoPreseleccionado }) {
             }}
           >
             <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", color: "var(--texto-tenue)", textTransform: "uppercase" }}>
-              Precio estimado
+              Estimado
             </span>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: "2.4rem", color: "var(--ascua-400)", marginTop: 6 }}>
-              {estimado ? `$${estimado.precio_estimado.toLocaleString("es-MX")}` : "—"}
-            </span>
-            {estimado && (
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.85rem", color: "var(--aluminio-300)" }}>
-                {estimado.metros_cuadrados} m²
+            {piezasExtra.length > 0 ? (
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: "1.1rem", color: "var(--aluminio-300)", marginTop: 6 }}>
+                Se calcula al enviar tu solicitud
               </span>
+            ) : (
+              <>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: "2rem", color: "var(--ascua-400)", marginTop: 6 }}>
+                  {estimado
+                    ? `$${Math.round(estimado.precio_estimado * 0.9).toLocaleString("es-MX")} – $${Math.round(estimado.precio_estimado * 1.1).toLocaleString("es-MX")}`
+                    : "—"}
+                </span>
+                {estimado && (
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.85rem", color: "var(--aluminio-300)" }}>
+                    {estimado.metros_cuadrados} m² · rango ±10%, sujeto a medición en sitio
+                  </span>
+                )}
+              </>
             )}
             {calculando && <span style={{ fontSize: "0.8rem", color: "var(--texto-tenue)", marginTop: 6 }}>calculando…</span>}
 
@@ -253,10 +321,20 @@ export default function Cotizador({ productoPreseleccionado }) {
         )}
 
         {enviado && (
-          <p style={{ color: "var(--vidrio-400)", fontWeight: 600, marginTop: 24 }}>
-            ¡Listo! Recibimos tu solicitud.{" "}
-            {usuario ? "Puedes ver su estatus en tu panel." : "El equipo de Los Mejía te contactará pronto."}
-          </p>
+          <div style={{ marginTop: 24 }}>
+            <p style={{ color: "var(--vidrio-400)", fontWeight: 600 }}>
+              ¡Listo! Recibimos tu solicitud.{" "}
+              {usuario ? "Puedes ver su estatus en tu panel." : "El equipo de Los Mejía te contactará pronto."}
+            </p>
+            {resultadoEnvio && (
+              <p style={{ color: "var(--texto-tenue)", fontSize: "0.85rem", marginTop: 6 }}>
+                Estimado: ${Math.round((resultadoEnvio.total ?? resultadoEnvio.precio_estimado) * 0.9).toLocaleString("es-MX")}
+                {" – "}
+                ${Math.round((resultadoEnvio.total ?? resultadoEnvio.precio_estimado) * 1.1).toLocaleString("es-MX")}
+                {" "}(rango ±10%, sujeto a medición en sitio){resultadoEnvio.folio && ` · Folio ${resultadoEnvio.folio}`}
+              </p>
+            )}
+          </div>
         )}
       </div>
     </section>
