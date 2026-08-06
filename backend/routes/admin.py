@@ -6,7 +6,7 @@ from urllib.parse import quote
 from flask import Blueprint, jsonify, request, current_app, send_file
 from werkzeug.utils import secure_filename
 from extensions import db
-from models import Producto, Cotizacion, Partida, Proyecto, Tarifa, Usuario, Pago, FotoAvance, Bitacora, ESTADOS_PROYECTO, registrar_bitacora
+from models import Producto, Cotizacion, Partida, Proyecto, Tarifa, Usuario, Pago, Bitacora, ESTADOS_PROYECTO, registrar_bitacora
 from auth import requiere_rol, usuario_actual, generar_token_cotizacion
 from validacion import numero
 from dominio.despiece import despiece

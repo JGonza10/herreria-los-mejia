@@ -3,7 +3,7 @@ bitácora, seguimiento/vigencia y agenda."""
 from datetime import date, timedelta
 
 from extensions import db
-from models import Cotizacion, Proyecto, Tarifa, PrecioTarifa, Usuario
+from models import Cotizacion, Tarifa, PrecioTarifa, Usuario
 
 
 def _admin(client, app):

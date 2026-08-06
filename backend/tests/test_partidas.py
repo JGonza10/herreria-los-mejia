@@ -5,7 +5,7 @@ y cualquier tipo en 'ml' (barandal) por metro lineal, no por m²."""
 from datetime import date
 
 from extensions import db
-from models import Tarifa, PrecioTarifa, TipoTrabajo, Usuario
+from models import Tarifa, PrecioTarifa, TipoTrabajo
 from dominio.spec import construir_basico
 from dominio.precios import cotizar_partida
 

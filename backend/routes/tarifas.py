@@ -9,7 +9,7 @@ depende de resolver cómo se cobra cada sistema (Fase 4.3).
 Antes de esta pantalla, la única forma de cambiar un precio era editar
 seed.py, hacer commit y redesplegar. Un dueño de taller no va a hacer eso.
 """
-from datetime import date, datetime
+from datetime import datetime
 from flask import Blueprint, jsonify, request
 from extensions import db
 from models import Tarifa, PrecioTarifa, registrar_bitacora
