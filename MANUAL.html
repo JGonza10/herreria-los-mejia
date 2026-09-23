@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manual del Sistema Herrería Los Mejía</title>
+<style>
+  :root { color-scheme: light; }
+  body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; max-width: 860px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; color: #24292f; line-height: 1.6; background: #fff; }
+  h1 { color: #0078d7; font-size: 1.9rem; margin-bottom: .2rem; }
+  h2 { color: #0078d7; font-size: 1.35rem; margin-top: 2rem; border-bottom: 1px solid #e1e4e8; padding-bottom: .3rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.4rem; }
+  h4 { font-size: 1rem; margin-top: 1.2rem; }
+  .subtitulo { color: #6b7280; font-style: italic; margin-top: 0; }
+  code { background: #f3f4f6; padding: .1rem .35rem; border-radius: 4px; font-size: .9em; color: #0078d7; }
+  pre { background: #f3f4f6; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: .85rem; }
+  pre code { background: none; padding: 0; color: inherit; }
+  blockquote { border-left: 3px solid #0078d7; margin-left: 0; padding-left: 1rem; color: #6b7280; font-style: italic; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .92rem; }
+  th, td { border: 1px solid #d1d5db; padding: .5rem .6rem; text-align: left; vertical-align: top; }
+  th { background: #0078d7; color: #fff; }
+  tr:nth-child(even) { background: #f9fafb; }
+  hr { border: none; border-top: 1px solid #d1d5db; margin: 1.5rem 0; }
+  .imprimir { margin: 1.5rem 0; }
+  .imprimir button { background: #0078d7; color: #fff; border: none; padding: .6rem 1.2rem; border-radius: 6px; font-size: .95rem; cursor: pointer; }
+  @media print { .imprimir { display: none; } body { max-width: none; } }
+</style>
+</head>
+<body>
+<div class="imprimir"><button onclick="window.print()">🖨️ Imprimir / Guardar como PDF</button></div>
+<h1>Manual del Sistema Herrería Los Mejía</h1>
+<p class="subtitulo">Manual de usuario del sitio y sistema de gestión de Herrería Los Mejía. Refleja el estado del código al 2026-09-08. Regenera los formatos imprimibles con `python generar_manual.py`.</p>
+<h2>1. Qué es</h2>
+<p>Sitio web y sistema de gestión para un taller que trabaja hierro, aluminio y vidrio: portones, rejas, barandales, ventanas, cancelería y escaleras. El objetivo central, el que decide cómo está armado todo: que el dueño del taller pueda tomar las medidas que da un cliente, simular la cotización, y mostrarle al cliente el resultado.</p>
+<p>Hay tres tipos de cuenta: <strong>cliente</strong>, <strong>trabajador</strong> y <strong>administrador</strong>. Cada uno entra por el mismo <code>/login</code> y ve un panel distinto según su rol.</p>
+<h2>2. El sitio público (sin cuenta)</h2>
+<p>Cualquier visitante, sin registrarse, puede:</p>
+<ul><li>Ver el <strong>catálogo de productos</strong> del taller, filtrable por material (hierro, aluminio, vidrio).</li><li>Usar el <strong>cotizador</strong>: elegir material y capturar ancho y alto (siempre en metros) para obtener un precio estimado al instante.</li><li>Usar el <strong>chatbot de atención</strong>, que responde dudas sobre materiales y tiempos, y guía a usar el cotizador si se quiere un precio — no da precios exactos por su cuenta, esos siempre salen del cotizador.</li><li><strong>Solicitar una cotización formal</strong>, dejando nombre y teléfono — no hace falta tener cuenta para pedirla.</li><li>Si recibiste el enlace de una cotización (por WhatsApp o donde te la haya compartido el taller), puedes <strong>verla y aceptarla</strong> desde ese enlace sin necesidad de iniciar sesión.</li></ul>
+<h2>3. Cuenta de cliente</h2>
+<p>Al registrarte (correo y contraseña) tienes acceso a tu propio panel:</p>
+<ul><li><strong>Mis cotizaciones</strong>: todas las que has solicitado, con su estado.</li><li><strong>Mis proyectos</strong>: los pedidos que ya se aprobaron y están en curso, con el avance en porcentaje, las fotos que suba el trabajador, y cuánto llevas pagado y cuánto resta.</li></ul>
+<h2>4. Cuenta de trabajador</h2>
+<p>El panel del trabajador muestra:</p>
+<ul><li><strong>Mis proyectos asignados</strong> y los <strong>proyectos pendientes</strong> sin asignar todavía, para ver qué hay en la cola general.</li><li>Actualizar el <strong>avance</strong> de un proyecto propio y cambiar su estado (a &quot;en proceso&quot; o &quot;terminado&quot;) — una regla de negocio impide pasar un proyecto a &quot;en proceso&quot; si todavía no tiene ningún anticipo registrado.</li><li><strong>Subir fotos de avance</strong> desde el teléfono, visibles después en el panel del cliente.</li><li><strong>Registrar horas trabajadas</strong> en un proyecto, con fecha y notas.</li><li>La <strong>calculadora de escaleras</strong> (ver sección 6) también está disponible para el trabajador, no solo para el administrador.</li></ul>
+<h2>5. Panel de administrador</h2>
+<p>El panel tiene estas pestañas:</p>
+<table><thead><tr><th>Pestaña</th><th>Para qué</th></tr></thead><tbody><tr><td>Pedidos</td><td>Los proyectos en curso: asignar trabajador, cambiar estado, capturar avance, registrar anticipos y pagos, y anotar el costo real de material al conciliar un proyecto.</td></tr><tr><td>Cotizaciones</td><td>Todas las solicitudes: aprobar (genera el proyecto automáticamente, con fecha estimada de entrega calculada según la carga de trabajo actual del taller) o rechazar. Cada cotización trae también un enlace de WhatsApp ya redactado para mandársela al cliente. Una vista de <strong>seguimiento</strong> agrupa las que llevan 3, 7 o 15+ días sin respuesta, y las que ya vencieron se pueden <strong>revivir</strong> recalculando con los precios vigentes.</td></tr><tr><td>Catálogo</td><td>Alta, edición y baja de productos del catálogo público, con imagen.</td></tr><tr><td>Tarifas</td><td>Listas de precios con fecha de vigencia. Solo una puede estar activa a la vez; nunca se edita una tarifa vieja, se crea una nueva versión — así una cotización de hace meses sigue siendo reconstruible con los precios que tenía cuando se hizo. Se puede duplicar una tarifa existente aplicando un ajuste porcentual parejo, en vez de capturar todo de nuevo.</td></tr><tr><td>Requisición</td><td>Suma el material de todos los proyectos activos (cuántas barras de 6 metros hacen falta en total), para comprar una sola vez en vez de varias veces por semana.</td></tr><tr><td>Agenda</td><td>Qué tan comprometida está la capacidad semanal del taller, con aviso si una semana ya está sobrecargada.</td></tr><tr><td>Reportes</td><td>Costo estimado contra costo real por proyecto, tasa de conversión de cotizaciones (por tipo de trabajo y por rango de precio) y horas trabajadas por metro cuadrado — todo también exportable a Excel.</td></tr><tr><td>Bitácora</td><td>Registro de quién cambió qué (precios, estados de proyecto, asignaciones) y cuándo.</td></tr><tr><td>Equipo</td><td>Alta de cuentas de trabajador o administrador, y restablecer la contraseña de alguien del equipo (no hay recuperación por correo: la reinicia el administrador).</td></tr><tr><td>Escalera</td><td>La calculadora de escaleras (ver sección 6), también disponible aquí.</td></tr></tbody></table>
+<p>Además, desde una cotización se puede generar una <strong>simulación de precio en vivo</strong>: el administrador ajusta mano de obra, flete, merma y utilidad y ve el total recalculado al momento, sin que se guarde nada hasta confirmarlo — y ve el margen sobre venta, no solo el porcentaje de utilidad sobre costo, que es un número distinto y más fácil de malinterpretar.</p>
+<h2>6. Calculadora de escaleras</h2>
+<p>Herramienta especializada (administrador y trabajador) que calcula escalones, huella, contrahuella, inclinación y espacio requerido para cuatro tipos de escalera: recta, en L, en U y de caracol. Valida el resultado contra el Reglamento de Construcciones de CDMX y la Ley de Blondel, avisando si algo queda fuera de norma (huella muy angosta, tramo sin descanso, escalera de caracol usada como principal, etc.). El resultado se puede descargar como PDF (con la vista 3D si se capturó) o como Excel.</p>
+<p><strong>Esto es una calculadora de apoyo para cotizar y fabricar, no un cálculo estructural certificado</strong> — si un proyecto cae bajo un reglamento distinto al de CDMX, hay que confirmarlo aparte.</p>
+<h2>7. Lista de corte y orden de trabajo</h2>
+<p>Para piezas con barrotes (portones, rejas, protecciones), el sistema puede calcular cuántos tramos de perfil hacen falta y cómo acomodarlos en barras comerciales de 6 metros, minimizando el sobrante. A partir de ahí se genera un PDF de <strong>orden de trabajo</strong> para el taller, sin precios — el trabajador no necesita verlos y no debe verlos si la hoja se queda en obra.</p>
+<h2>8. Instalación y arranque</h2>
+<pre><code># Backend — sin DATABASE_URL cae a SQLite, no hace falta PostgreSQL local
+cd backend
+venv\Scripts\activate
+pip install -r requirements.txt
+python seed.py
+python app.py                   # http://localhost:5000
+
+# Frontend
+cd frontend
+npm install
+npm run dev                     # http://localhost:5173</code></pre>
+<p><code>backend/.env</code> (nunca se sube al repositorio): <code>SECRET_KEY</code>, <code>ANTHROPIC_API_KEY</code> (para el chatbot), <code>FRONTEND_ORIGIN</code>, <code>PORT</code>. En producción corre como dos servicios separados en Railway (backend y frontend) con una base PostgreSQL.</p>
+<h2>9. Lo que todavía no hace</h2>
+<ul><li><strong>No hay migraciones de base de datos formales (Alembic)</strong>: el esquema se crea solo al arrancar, pero agregar una columna nueva a una tabla que ya existe en producción no se aplica sola — hay que tenerlo presente antes de cualquier cambio de estructura.</li><li><strong>El disco donde se guardan las fotos de productos y de avance es efímero en Railway</strong>: si no hay un volumen de almacenamiento montado, esas imágenes se pueden perder en cada despliegue nuevo.</li><li><strong>No se puede cerrar sesión de forma forzada a distancia</strong>: los tokens de acceso duran 30 días y no se pueden revocar uno por uno; solo cambiar la contraseña de esa cuenta invalida sus sesiones abiertas.</li><li><strong>No hay recuperación de contraseña por correo</strong>: para un cliente, no está resuelta (tendría que pedirle al taller que le ayude); para trabajador o administrador, la restablece otro administrador desde la pestaña Equipo. Es una decisión deliberada para un taller chico, no un pendiente técnico.</li><li><strong>El chatbot depende de una API externa de pago</strong> (Anthropic) con la llave del propio taller — tiene límite de peticiones para evitar abuso, pero si la llave no está configurada en el servidor, el chatbot simplemente avisa que no está disponible en vez de fallar.</li><li><strong>No hay pasarela de pagos en línea ni facturación electrónica (CFDI)</strong>: los anticipos y pagos se registran a mano en el sistema después de recibirse por transferencia o efectivo; no se cobran desde la web.</li><li><strong>No existe una app móvil nativa</strong> — el sistema está pensado para usarse desde el navegador del teléfono en el taller y en obra.</li><li><strong>El modelo 3D solo existe para escaleras</strong> por ahora; el resto del catálogo (ventanas, portones, rejas, cancelería) todavía no tiene su propia vista 3D ni un alzado 2D acotado listo para imprimir junto al precio.</li></ul>
+</body>
+</html>
